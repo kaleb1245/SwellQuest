@@ -178,11 +178,43 @@ input[type=range]{width:100%;accent-color:var(--turq)}
   .dock{left:max(10px,env(safe-area-inset-left,0px));right:max(10px,env(safe-area-inset-right,0px));width:auto}
 }
 @media (prefers-reduced-motion:reduce){#pop.on{animation-duration:.01s}}
+
+/* 1 v 1 heat scoreboard: sized from the screen width so it stays around a fifteenth of the view */
+#heatBoard{display:none}
+body.in-heat #heatBoard{display:block;position:fixed;top:10px;left:12px;z-index:7;font-size:clamp(11px,1.08vw,21px);width:32em;background:rgba(22,22,24,.84);backdrop-filter:blur(8px);border-radius:.8em;padding:.6em 1em .2em;color:#f4f4f4;font-family:"Barlow",system-ui,sans-serif;pointer-events:none}
+body.in-heat .top,body.in-heat #gear,body.in-heat #stormBtn,body.in-heat .topr a[href="#map"],body.in-heat #dock{display:none!important}
+.hb-head{display:flex;justify-content:space-between;align-items:center;padding-bottom:.35em;border-bottom:1px solid rgba(255,255,255,.1)}
+.hb-head b{font-family:"Archivo",Arial,sans-serif;font-weight:800;font-size:1.1em}
+.hb-live{font-weight:700;font-size:1em;letter-spacing:.04em;display:flex;align-items:center;gap:.45em;font-variant-numeric:tabular-nums}
+.hb-live i{width:.6em;height:.6em;border-radius:50%;background:#e02424;display:inline-block;animation:hbp 1.4s infinite}
+@keyframes hbp{50%{opacity:.3}}
+.hb-row{display:grid;grid-template-columns:2.6em minmax(0,1fr) 4em 4em 4em;gap:.6em;align-items:center;padding:.5em 0;border-bottom:1px solid rgba(255,255,255,.08)}
+.hb-row:last-child{border-bottom:0}
+.hb-jer{width:2.5em;height:2.5em;border-radius:50%;display:grid;place-items:center;font-family:"Archivo",Arial,sans-serif;font-weight:900;font-size:1.05em;color:#fff;border:.18em solid rgba(255,255,255,.85);text-shadow:0 1px 2px rgba(0,0,0,.5)}
+.hb-who{min-width:0;display:grid;gap:.1em}
+.hb-who b{font-size:1.15em;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:flex;align-items:center;gap:.4em}
+.hb-who span{font-size:.85em;color:#a9a9ad;display:flex;align-items:center;gap:.4em}
+.hflag{width:1.6em;height:1.1em;border-radius:2px;object-fit:cover;box-shadow:0 0 0 1px rgba(255,255,255,.3)}
+.hb-p{font-size:.65em;font-weight:800;background:#f4f4f4;color:#111;border-radius:.3em;padding:0 .4em;line-height:1.5}
+.hb-need{font-size:.65em;font-weight:800;color:#f5c542;border:1.5px solid #f5c542;border-radius:.3em;padding:0 .4em;line-height:1.5;letter-spacing:.03em}
+.hb-s{text-align:right;font-family:"Archivo",Arial,sans-serif;font-weight:800;font-size:1.2em;font-variant-numeric:tabular-nums;line-height:1.1}
+.hb-s small{display:block;font-family:"Barlow",system-ui,sans-serif;font-weight:400;font-size:.6em;color:#a9a9ad}
+body.in-heat #result{padding-top:13vw}
+#heatEnd{position:fixed;inset:0;z-index:30;display:grid;place-items:center;background:rgba(5,8,14,.55)}
+#heatEnd[hidden]{display:none}
+#heatEnd .card{background:#1b1418;border:1px solid rgba(255,190,150,.25);border-radius:16px;padding:26px 28px;display:grid;gap:14px;min-width:340px;text-align:center;color:#fff3e6}
+#heatEnd h2{font-family:"Archivo",Arial,sans-serif;font-size:34px;font-weight:900;margin:0}
+.he-scores{display:grid;gap:8px}
+.he-scores div{display:grid;grid-template-columns:18px 1fr auto;gap:10px;align-items:center;background:rgba(255,255,255,.05);border-radius:10px;padding:10px 14px;text-align:left}
+.he-scores span{width:16px;height:16px;border-radius:50%}
+.he-scores em{font-style:normal;font-family:"Archivo",Arial,sans-serif;font-weight:900;font-size:22px}
 .fatal{position:fixed;inset:0;display:grid;place-items:center;padding:24px;text-align:center;background:var(--abyss)}
 </style>
 
 <div id="stage" aria-label="3D surf session"></div>
 <div class="top"><span class="brand">SWELL<i>QUEST</i></span><span class="tag" id="breakTag">Snapper Rocks</span><span class="tag career" id="career"></span></div>
+<div id="heatBoard" aria-live="polite"></div>
+<div id="heatEnd" hidden></div>
 <div id="prompt" role="status" aria-live="polite">Waiting for a set…</div>
 <div id="pop" aria-hidden="true"></div>
 <div id="tricks" aria-live="polite"></div>
@@ -308,15 +340,17 @@ function peelStart(){return P.aframe?(P.peakX||0):-P.dir*(P.span/2-12)}
 const QUALITY={
   low:{label:"Low",nxMax:420,nx:90,pr:1,parts:450,seg:70,lowq:true},
   medium:{label:"Medium",nxMax:800,nx:150,pr:1.5,parts:1500,seg:130,lowq:false},
-  high:{label:"High",nxMax:1150,nx:230,pr:2,parts:3500,seg:200,lowq:false}
+  high:{label:"High",nxMax:1150,nx:230,pr:2,parts:3500,seg:200,lowq:false},
+  ultra:{label:"Ultra",nxMax:1500,nx:300,pr:2,parts:5000,seg:260,lowq:false}
 };
 const _CAMS=[["barrel","Barrel","In the pocket, where the surfer will ride"],["channel","Channel","Side-on from the channel, the classic photo angle"],["line","Down the line","Low in the water, ahead of the curl"],["beach","Beach","From the sand"],["drone","Drone","Overhead, following the peel"],["back","Behind","From out the back"],["free","Free","Drag to orbit, pinch or scroll to zoom"]];
 const isPhone=false; // desktop only
 const reduceMotion=matchMedia("(prefers-reduced-motion: reduce)").matches;
 
 let breakId="snapper", P=Object.assign({},BREAKS[breakId]);
-let qualityId=isPhone?"low":"medium", Q=QUALITY[qualityId];
-let timeScale=1, paused=false, rideW=null;
+let qualityPicked=false;
+let qualityId=(()=>{try{const q=localStorage.getItem("swellquest.quality");if(q&&QUALITY[q]){qualityPicked=true;return q}}catch(e){}return "high"})(), Q=QUALITY[qualityId];
+let timeScale=1, paused=false, rideW=null, HEAT=null;
 
 /* ---------- renderer & scene ---------- */
 const stage=document.getElementById("stage");
@@ -460,7 +494,7 @@ function buildOcean(){
 let land=null;
 function rnd(seed){let s=seed;return()=>((s=Math.imul(s^s>>>15,1|s)+0x6D2B79F5|0)>>>0)/4294967296}
 function buildLand(){
-  if(land){scene.remove(land);land.traverse(o=>{if(o.geometry)o.geometry.dispose();if(o.material)o.material.dispose()})}
+  if(land){scene.remove(land);const seen=new Set();land.traverse(o=>{if(o.geometry)o.geometry.dispose();if(o.material)[].concat(o.material).forEach(m=>{if(seen.has(m))return;seen.add(m);if(m.map)m.map.dispose();m.dispose()})})}
   land=new THREE.Group();let hs=7;for(const c of P.name)hs=Math.imul(hs^c.charCodeAt(0),16777619);const r=rnd(hs>>>0);
   const bz=P.beachZ,D=P.dir,L=P.land,half=P.span/2,headX=P.aframe?-D*(half+40):-D*(half+24);
   const lam=c=>new THREE.MeshLambertMaterial({color:c,flatShading:true});
@@ -470,7 +504,7 @@ function buildLand(){
     ico1:new THREE.IcosahedronGeometry(1,1),ico2:new THREE.IcosahedronGeometry(1,2),frond:new THREE.PlaneGeometry(4.2,.9),sph:new THREE.SphereGeometry(1,10,6)};
   const bins=new Map(),o=new THREE.Object3D();
   const put=(p,mat,fn)=>{o.position.set(0,0,0);o.rotation.set(0,0,0);o.scale.set(1,1,1);fn(o);o.updateMatrix();
-    const key=p+"|"+mat.uuid;if(!bins.has(key))bins.set(key,{p,mat,list:[]});bins.get(key).list.push(o.matrix.clone())};
+    const key=p+"|"+(Array.isArray(mat)?mat.map(m=>m.uuid).join(","):mat.uuid);if(!bins.has(key))bins.set(key,{p,mat,list:[]});bins.get(key).list.push(o.matrix.clone())};
   const plain=(geo,mat,x,y,z)=>{const mm=new THREE.Mesh(geo,mat);mm.position.set(x,y,z);land.add(mm);return mm};
   if(L!=="island"){
     const sand=new THREE.PlaneGeometry(P.span+2600,160,Math.min(400,Math.round((P.span+2600)/12)),8);sand.rotateX(-Math.PI/2);
@@ -490,13 +524,23 @@ function buildLand(){
   const shoreRocks=(n,x0,x1,zc,size)=>{for(let k=0;k<n;k++)rock(x0+(x1-x0)*r(),-.6+r(),zc+(r()-.5)*10,size*(.5+r()),.45+r()*.35)};
   const headland=(n,len)=>{for(let k=0;k<n;k++){const t=k/(n-1);rock(headX-D*(t*t*len)+(r()-.5)*10,-1+t*4+r()*1.5,-38+t*(bz+30),2.5+r()*3.5+t*5,.55+r()*.4)}};
   const W0=-(half+300),W1=half+300,span=W1-W0;
+  /* building facades with rows of windows: painted once on a canvas, shared by every building of that colour and height */
+  const facadeTex=(base,floors,cols)=>{const c=document.createElement("canvas");c.width=128;c.height=256;const x=c.getContext("2d");
+    x.fillStyle=base;x.fillRect(0,0,128,256);const fh=256/floors,cw=128/cols;
+    for(let f=0;f<floors;f++){x.fillStyle="rgba(0,0,0,.06)";x.fillRect(0,f*fh+fh*.82,128,fh*.18);
+      for(let k=0;k<cols;k++){const lit=r()<.12;const g=x.createLinearGradient(0,f*fh,0,f*fh+fh*.6);
+        g.addColorStop(0,lit?"#f4e2b0":"#5d7f99");g.addColorStop(1,lit?"#d9b979":"#2c4459");x.fillStyle=g;x.fillRect(k*cw+cw*.18,f*fh+fh*.16,cw*.64,fh*.56)}}
+    const t=new THREE.CanvasTexture(c);t.anisotropy=4;return t};
+  const roofMat=lam(0xb9bec4);
+  const facade=(base,floors,cols)=>{const side=new THREE.MeshLambertMaterial({map:facadeTex(base,floors,cols)});const top=new THREE.MeshLambertMaterial({color:0xc4c8cc});return [side,side,top,top,side,side]};
   switch(L){
     case "point":{
       headland(26,28);
       for(let k=0;k<9;k++)pine(headX-D*(14+r()*18),bz-12+r()*26,10+r()*8);
       for(let x=W0;x<W1;x+=60)pine(x+(r()-.5)*30,bz+40+r()*25,9+r()*7,6);
-      const bMat=lam(0xdfe5ea);
-      for(let k=0;k<Math.round(span/60);k++){const w=8+r()*10,hh=12+r()*45;box(bMat,W0+r()*span,hh/2+4,bz+90+r()*60,w,hh,w)}
+      const tones=["#e6e9ec","#e9dfcf","#d6dee6","#efe8dc"],sets=tones.map(t=>[facade(t,5,3),facade(t,10,4),facade(t,18,5)]);
+      for(let k=0;k<Math.round(span/60);k++){const w=8+r()*10,hh=12+r()*45,x=W0+r()*span,z=bz+90+r()*60,s=sets[(r()*tones.length)|0][hh<22?0:hh<40?1:2];
+        box(s,x,hh/2+4,z,w,hh,w);if(r()<.55)box(roofMat,x+(r()-.5)*w*.3,hh+4+1,z+(r()-.5)*w*.3,w*.35,2,w*.35)}
       break}
     case "palms":
       for(let x=W0;x<W1;x+=15)palm(x+(r()-.5)*8,bz+10+r()*22,8+r()*6);
@@ -508,7 +552,7 @@ function buildLand(){
       box(greenMat,0,33,bz+60,span,3,40);
       break;
     case "beach":{
-      const duneMat=lam(P.sand),hMat=lam(0xe9e4da),roof=lam(0xb5543a);
+      const duneMat=lam(P.sand),hMat=facade("#ece6db",2,3),roof=lam(0xb5543a);
       for(let x=W0;x<W1;x+=40)put("sph",duneMat,q=>{q.position.set(x+(r()-.5)*20,-14,bz+40+r()*12);q.scale.set(28,28*(.45+r()*.25),28*.6)});
       for(let x=W0;x<W1;x+=22)pine(x+(r()-.5)*14,bz+62+r()*18,9+r()*6,6);
       for(let k=0;k<Math.round(span/90);k++){const x=W0+r()*span,z=bz+80+r()*30,w=6+r()*5;box(hMat,x,8,z,w,5,w);put("cone4",roof,q=>{q.position.set(x,12,z);q.rotation.y=Math.PI/4;q.scale.set(w*.75,3,w*.75)})}
@@ -571,7 +615,7 @@ const foamMat=new THREE.ShaderMaterial({transparent:true,depthWrite:true,uniform
     void main(){vec3 n=normalize(vN);float l=max(dot(n,uSun),0.);
       vec3 p=vW*1.6+vec3(0.,uTime*.9,uTime*.6);float bub=n3(p)*.55+n3(p*2.3)*.3+n3(p*5.1)*.15;
       vec3 col=mix(vec3(.6,.71,.8),vec3(1.),.4+.45*l+.3*bub);col*=.86+.2*smoothstep(.35,.8,bub);col+=vec3(.08)*pow(1.-abs(n.y),2.);
-      float a=vF*smoothstep(.2,.55,bub*.7+vF*.5);if(a<.02)discard;gl_FragColor=vec4(col,a);}`});
+      float a=vF*smoothstep(.2,.55,bub*.7+vF*.5)*smoothstep(1.4,4.,distance(vW,cameraPosition));if(a<.02)discard;gl_FragColor=vec4(col,a);}`});   // foam right in front of the lens fades out so it never blocks the view
 function makeFoamPile(nx){const g=new THREE.BufferGeometry();g.setAttribute("position",new THREE.BufferAttribute(new Float32Array(nx*NPF*3),3));
   g.setAttribute("aF",new THREE.BufferAttribute(new Float32Array(nx*NPF),1));const idx=[];
   for(let i=0;i<nx-1;i++)for(let j=0;j<NPF-1;j++){const a=i*NPF+j,b=a+NPF;idx.push(a,b,a+1,b,b+1,a+1)}g.setIndex(idx);
@@ -780,16 +824,19 @@ let wFrame=0,spawnClock=0;const SET_GAP=()=>P.storm?.5:1.5;   // pause before th
 function stepWaves(dt,t){
   wFrame++;const A=activeWave();
   waves.forEach((W,idx)=>{
-    W.z+=(W.peeling?(W===rideW||W.hot?VZ:2.4):(W.boost?3.2:.9))*dt;   // waves nobody is riding clear out quickly   // swells roll in, then slow right down once breaking
+    if(W.remote)heatMoveRemote(W,dt);
+    else if(HEAT&&W.clock&&!W.peeling)W.z=heatClockZ(W);
+    else W.z+=(W.peeling?(W===rideW||W.hot?VZ:2.4):(W.boost?3.2:.9))*dt;   // waves nobody is riding clear out quickly   // swells roll in, then slow right down once breaking
     if(!W.peeling&&W.z>=BREAK_Z){W.peeling=true;W.peelX=peelStart()}
-    if(W.peeling)W.peelX+=P.dir*P.peel*Math.sqrt(P.H/2)*dt;
+    if(W.peeling&&!W.remote)W.peelX+=P.dir*P.peel*Math.sqrt(P.H/2)*dt;
     // background waves only need a refresh every third frame
     if(W===A||W===rideW||W.hot||W.dirty!==false||(wFrame+idx)%3===0){updateWave(W,t);W.dirty=false}
   });
   waves=waves.filter(W=>{if(W.fade<=0&&W.z>P.beachZ-10){disposeWave(W);return false}return true});
+  if(HEAT)return;   // in a 1 v 1 heat the host sends out the waves
   spawnClock+=dt;
   // keep it light: one unbroken wave on its way at a time, the next one appears as soon as it breaks
-  if(waves.length>=4){const old=waves.find(W=>W.peeling&&W!==rideW&&!W.hot);if(old){disposeWave(old);waves=waves.filter(W=>W!==old)}}
+  if(waves.length>=4){const old=waves.find(W=>W.peeling&&W!==rideW&&!W.hot&&!W.remote);if(old){disposeWave(old);waves=waves.filter(W=>W!==old)}}
   const unbroken=waves.reduce((n,W)=>n+(W.peeling?0:1),0);
   if(waves.length<4&&(waves.length===0||unbroken===0&&spawnClock>SET_GAP())){const nw=makeWave(SPAWN_Z);updateWave(nw,t);nw.dirty=false;waves.push(nw);spawnClock=0}   // shape it straight away so nothing samples an empty wave
 }
@@ -930,6 +977,7 @@ function rate(id,c,tl){
 let override=null,cond=null;
 function applyConditions(){
   const base=BREAKS[breakId];
+  if(HEAT&&HEAT.P){P=Object.assign({},base,HEAT.P);uniforms.uChop.value=HEAT.P.chop||1;cond=null;renderTag();return}
   if(override!=null){P=Object.assign({},base,{H:override});uniforms.uChop.value=1;cond=null;renderTag();return}
   const c=dayCond(breakId,0),tl=tideLevel(breakId,Date.now());let r=rate(breakId,c,tl);
   const storm=Date.now()<career.stormUntil;
@@ -1243,14 +1291,17 @@ function makeBoard(spec,acc,opt){
   };
   paintDeck();
   dt=new THREE.CanvasTexture(dc);dt.anisotropy=8;dt.repeat.set(1/L,-1/.51);dt.offset.set(.5,.5);onLogos(()=>{paintDeck();dt.needsUpdate=true});
-  const sideM=new THREE.MeshStandardMaterial({vertexColors:true,roughness:.35,metalness:0});
+  const sideM=spec.finish==="matte"?new THREE.MeshStandardMaterial({vertexColors:true,roughness:.35,metalness:0}):new THREE.MeshPhysicalMaterial({vertexColors:true,roughness:.35,metalness:0,clearcoat:.6,clearcoatRoughness:.25});
   let botM=sideM;
   const bsrc=spec.bottomCanvas||(spec.art&&spec.art.bottom);
   if(bsrc){const bc=document.createElement("canvas");bc.width=512;bc.height=141;const bx=bc.getContext("2d");let bt=null;
     const paintB=()=>{bx.fillStyle="#"+under.getHexString();bx.fillRect(0,0,512,141);const im=spec.bottomCanvas||artImage(spec.art.bottom,()=>{paintB();if(bt)bt.needsUpdate=true});if(im)bx.drawImage(im,0,0,512,141)};
     paintB();bt=new THREE.CanvasTexture(bc);bt.repeat.set(1/L,-1/.51);bt.offset.set(.5,.5);botM=new THREE.MeshStandardMaterial({map:bt,roughness:.4,metalness:0})}
   const fin=spec.finish==="matte"?.6:.35;
-  grp.add(new THREE.Mesh(g,[new THREE.MeshStandardMaterial({map:dt,roughness:fin,metalness:0}),sideM,botM]));
+  // glassed boards get a glossy resin clear coat; matte sprays stay flat
+  const gloss=spec.finish==="matte"?0:.75;
+  const topM=gloss?new THREE.MeshPhysicalMaterial({map:dt,roughness:fin,metalness:0,clearcoat:gloss,clearcoatRoughness:.22}):new THREE.MeshStandardMaterial({map:dt,roughness:fin,metalness:0});
+  grp.add(new THREE.Mesh(g,[topM,sideM,botM]));
   
   const finS=new THREE.Shape();finS.moveTo(0,0);finS.lineTo(.11,0);finS.quadraticCurveTo(.02,-.05,-.02,-.11);finS.lineTo(0,0);
   const finG=new THREE.ShapeGeometry(finS),finM=new THREE.MeshStandardMaterial({color:acc.fin||0x1b2b3d,roughness:.35,side:THREE.DoubleSide});
@@ -1428,7 +1479,7 @@ function styleRider(R,L){
 
 function makeRider(){
   const M=c=>new THREE.MeshStandardMaterial({color:c,roughness:.8});
-  const skin=M(LOOK.skin),rash=M(LOOK.rash),shorts=M(LOOK.shorts),hair=M(LOOK.hair),trim=M(LOOK.trim),armSkin=M(LOOK.skin),legSkin=M(LOOK.skin),hatM=M(0x1c2b4a);
+  const skin=new THREE.MeshStandardMaterial({color:LOOK.skin,roughness:.55}),rash=M(LOOK.rash),shorts=M(LOOK.shorts),hair=M(LOOK.hair),trim=M(LOOK.trim),armSkin=M(LOOK.skin),legSkin=M(LOOK.skin),hatM=M(0x1c2b4a);
   const root=new THREE.Group();
   const pelvis=new THREE.Group();root.add(pelvis);
   pelvis.add(new THREE.Mesh(new THREE.BoxGeometry(.32,.2,.2),shorts));
@@ -1613,11 +1664,15 @@ function onStageTap(e){
   const along=P.dir*(hit.point.x-PEEL_START());
   if(along<-2){setPrompt("That's behind the peak, it won't break there. Tap closer to the rocks or reef.",true);msgT=2.5;return}
   if(along>45){setPrompt("Too far down the line, the wave is too soft there. Tap closer to the peak.",true);msgT=2.5;return}
+  if(HEAT&&HEAT.over){setPrompt("The heat is over. Wait for the results.",true);msgT=2;return}
+  if(HEAT&&W.oppTook){setPrompt(`${HEAT.opp.name} is already on that wave.`,true);msgT=2;return}
   target={W,x:hit.point.x,along,stage:0,dzR:99};W.hot=true;W.boost=true;mode="paddle";
+  if(HEAT){HEAT.myClaimAt=heatNow();W.clock=false;heatSend({t:"claim",id:W.hid,at:Math.round(HEAT.myClaimAt)})}
   const deep=along<10?"Deep take-off, right at the peak":along<24?"Good spot, in the pocket":"Down the line, an easier, softer take-off";
   setPrompt(`<b>Paddling.</b> ${deep}.`);msgT=0;
 }
 function startRing(){
+  if(HEAT){const lose=heatLosesWave(target.W);if(lose){timeScale=1;heatSend({t:"claim",id:null});ride=null;mode="result";showResult("Priority",lose,null);trickCall("Priority",HEAT.opp.name+" has it");return}}
   mode="ring";ringT=0;timeScale=.3;ringW=target.W;
   ringZoneW=(RING_ZONE[breakId]||Math.round(84-32*P.hollow))*(target.along<10?.75:target.along<24?1:1.2)*rideStats().zone;
   ringZone=150+Math.random()*150;
@@ -1638,6 +1693,7 @@ function ringTap(){
   else if(ad<=ringZoneW*.95){q=.35;label=diff>0?"Late drop":"Early, sluggish";sub="Hang on"}
   else{q=0}
   document.getElementById("ring").hidden=true;timeScale=1;
+  if(HEAT&&(q>0||a>ringZone))heatUsedWave();
   if(q===0){
     if(a>ringZone){wipeout("Over the falls","You went too late and the lip threw you over with it.")}
     else{missWave("Too early. You stroked in before the wave stood up and it rolled under you.")}
@@ -1646,6 +1702,7 @@ function ringTap(){
   if(q===1)trickCall("Perfect","",true);else popText(label,sub);takeOff(q);
 }
 function missWave(why){
+  if(HEAT&&heatSend)heatSend({t:"claim",id:null});
   ride=null;mode="result";showResult("Missed it",why,null);
 }
 
@@ -1713,7 +1770,8 @@ function wipeout(title,why){
   // a hard enough wipeout can snap the board (the beginner soft-top never snaps)
   const gs=R.gs||rideStats(),heavy=({falls:1,lip:.8,inside:.35})[kind];
   R.wipe.leashBroken=Math.random()<(1-gs.dur)*.55*heavy*Math.min(1.5,P.H/2.5);       // weak leashes can break on heavy wipeouts
-  const pSnap=Math.max(0,Math.min(.85,(.05+({falls:.32,lip:.26,inside:.1})[kind]+(P.H-1.5)*.13+Math.max(0,R.s-8)*.03+(R.wipe.leashBroken?.2:0))*gs.snapMul));
+  // boards only snap on a really bad wipeout: going over the falls or taking the lip on a big, fast wave
+  const pSnap=Math.max(0,Math.min(.3,(({falls:.07,lip:.045,inside:0})[kind]+Math.max(0,P.H-2.5)*.02+Math.max(0,R.s-10)*.01+(R.wipe.leashBroken?.04:0))*gs.snapMul));
   R.wipe.snap=Math.random()<(window.__forceSnap?1:pSnap);
   if(R.wipe.leashBroken)setTimeout(()=>popText("Leash snapped","Your board is washing in"),700);
   shake=.35;popText("Wipeout",title);
@@ -2108,6 +2166,7 @@ function showResult(title,why,R,good){
   if(!snap.hidden)snap.innerHTML=`<b>Your ${BOARDS[curBoard].name} snapped.</b> It's gone from your quiver. Buy a replacement in the Surfboard Shop. Until then you're back on your soft-top, which never snaps.`;
   if(scored){
     const J=judgeRide(R,outcome),E=earnings(R,J,outcome),A=awardRide(R,J,E,outcome);
+    if(HEAT)heatScore(J.score);
     document.getElementById("resScore").textContent=J.score.toFixed(2);
     document.getElementById("resBand").textContent=band(J.score);
     document.getElementById("resJudges").innerHTML=J.judges.map(j=>`<div class="judge"><span class="jc">${j.code}</span><b>${j.score.toFixed(1)}</b><span class="jn">${j.name}</span><span class="jl">Likes ${j.likes}</span></div>`).join("");
@@ -2219,7 +2278,9 @@ function updateCamera(raw){
   let k=1-Math.exp(-raw*3.2),fovT=58;
   camSwitch=Math.max(0,camSwitch-raw*1.6);
   if(camMode==="free"){controls.target.lerp(camFocus(),.12);controls.update();return}
-  if(mode==="lineup"||mode==="paddle"||mode==="ring"){
+  if(mode==="lineup"&&heatWatch()){const g=HEAT.ghost.rp,D=P.dir;
+    camPos.set(g.x+D*(9+P.H*1.5),P.H*1.2+2.4,g.z+P.H*3.2+8);camLook.set(g.x-D*1.5,g.y+.9,g.z);k=1-Math.exp(-raw*1.8);fovT=52;
+  }else if(mode==="lineup"||mode==="paddle"||mode==="ring"){
     const near=mode==="ring"||mode==="paddle"&&target&&target.fr>=0&&target.fr<1.6;
     if(near){camPos.set(sit.x-P.dir*4.6,P.H*1.1+1.7,sit.z+7.2);camLook.set(sit.x+P.dir*1.5,P.H*.45,sit.z-1)}
     else{const W=incomingWave()||activeWave();camPos.set(sit.x-P.dir*3,2.6,sit.z+9);camLook.set(sit.x+P.dir*4,1.2,W?Math.min(W.z,sit.z-8):sit.z-25)}
@@ -2251,9 +2312,30 @@ function updateCamera(raw){
     const cy=ride.airY+1.6+P.H*.35,b=ride.airCam;camPos.y=lerp(camPos.y,Math.min(camPos.y,cy),b);camLook.y=lerp(camLook.y,(surfer.position.y+ride.airY)/2+.6,b);fovT=lerp(fovT,64,b)}
   if(camSwitch>0&&camMode!=="first")k=Math.min(k,1-Math.exp(-raw*2.6));   // ease between camera angles
   camera.position.lerp(camPos,k);curLook.lerp(camLook,Math.min(1,k*1.3));
+  if(ride&&!ride.wipe&&!ride.air&&(ride.camB||0)>.08&&(camMode==="behind"||camMode==="close"||camMode==="chase"))keepInTube(camera.position,ride);
   if(shake>0){shake=Math.max(0,shake-raw);const a=shake*.5;camera.position.x+=(Math.random()-.5)*a;camera.position.y+=(Math.random()-.5)*a}
   camera.lookAt(curLook);
   if(Math.abs(camera.fov-fovT)>.2){camera.fov+=(fovT-camera.fov)*Math.min(1,raw*4);camera.updateProjectionMatrix()}
+}
+
+/* the tube's shape at a point along the wave, worked out the same way the wave mesh builds it */
+function tubeAt(W,x){
+  if(!W.xs)return null;const f=colAt(W,x),i=Math.floor(f),t=f-i,j=Math.min(W.nx-1,i+1);
+  const Hc=W.Hc[i]*(1-t)+W.Hc[j]*t,c=W.c[i]*(1-t)+W.c[j]*t,d=W.d[i]*(1-t)+W.d[j]*t;
+  const R=Hc*(.28+.25*c)+.001,th=Hc*P.lipT*(.3+.7*c)+.01,yc=Hc-R,aTip=(100-158*c)*DEG,st=1+P.reach*c,k=Math.cos(aTip);
+  return {Hc,c,d,R,th,yc,tipZ:W.z+(k>0?k*st:k)*R};
+}
+const camTmp=new THREE.Vector3();
+function keepInTube(cp,R){
+  const W=R.W;if(!W||!waves.includes(W))return;const H=P.H,D=P.dir,b=Math.min(1,(R.camB-.08)/.3);
+  // stay ahead of the curl so the foam ball stays behind the camera
+  if(camMode!=="chase"&&R.lastS){const dS=R.lastS.d!=null?R.lastS.d:H,dMin=Math.min(.6*H,dS-(camMode==="close"?1.8:2.4));const T0=tubeAt(W,cp.x);
+    if(T0&&T0.d<dMin)cp.x+=D*(dMin-T0.d)*b}
+  const T=tubeAt(W,cp.x);if(!T||T.c<.28||T.Hc<.6)return;
+  // stay inside the falling lip: never out past the curtain of water or up in the lip itself
+  const inner=Math.max(T.tipZ-T.th-.35,surfer.position.z+.25);if(cp.z>inner)cp.z-=(cp.z-inner)*b;
+  const ceil=T.yc+T.R*.55;if(cp.y>ceil&&cp.z>W.z-T.R*.4)cp.y-=(cp.y-ceil)*b;
+  const floor=surfaceAt(cp.x,cp.z,simT)+.3;if(cp.y<floor)cp.y=floor;
 }
 
 /* ---------- input ---------- */
@@ -2310,7 +2392,7 @@ document.getElementById("quals").innerHTML=Object.entries(QUALITY).map(([id,q])=
 document.addEventListener("click",e=>{
   const b=e.target.closest("[data-break]");if(b){openForecast(b.dataset.break);return}
   const c=e.target.closest("[data-cam]");if(c){setCam(c.dataset.cam);return}
-  const q=e.target.closest("[data-q]");if(q){setQuality(q.dataset.q);return}
+  const q=e.target.closest("[data-q]");if(q){setQuality(q.dataset.q);qualityPicked=true;try{localStorage.setItem("swellquest.quality",q.dataset.q)}catch(err){}return}
   if(e.target.id==="useFc"){override=null;applyConditions();syncSize();return}
   const fb=e.target.closest("[data-fc]");if(fb){fcBreak=fb.dataset.fc;renderForecast();return}
   const gb=e.target.closest("[data-go-break]");if(gb){const r=travel(gb.dataset.goBreak);
@@ -2341,15 +2423,23 @@ function frame(now){
     try{tick(raw)}catch(err){if(!frame.warned){frame.warned=1;console.error("SwellQuest frame error",err)}}
     renderer.render(scene,camera)}   // paused behind the menu
 }
+/* if the game runs slowly on this computer, drop the graphics a level (only when the player hasn't picked one themselves) */
+const perf={t:0,n:0,cool:8};
+function watchSpeed(raw){if(qualityPicked||qualityId==="low")return;perf.cool-=raw;if(perf.cool>0)return;perf.t+=raw;perf.n++;
+  if(perf.t>=6){const fps=perf.n/perf.t;perf.t=0;perf.n=0;
+    if(fps<34){const order=["low","medium","high","ultra"],i=order.indexOf(qualityId);if(i>0){setQuality(order[i-1]);perf.cool=10;popText("Graphics lowered","So the game runs smoothly on this computer")}}}}
 function tick(raw){
+  watchSpeed(raw);
   const dt=paused?0:raw*timeScale;simT+=dt;uniforms.uTime.value=simT;
-  stepWaves(dt,simT);stepParticles(dt);sprayStep(dt);
+  stepWaves(dt,simT);if(HEAT)heatTick(raw);stepParticles(dt);sprayStep(dt);
   stormTick-=raw;if(stormTick<=0){stormTick=1;if(career.stormUntil){renderTag();if(Date.now()>=career.stormUntil){career.stormUntil=0;saveCareer();applyConditions();popText("Perfect Storm over","")}}}
   if(mode==="lineup"){
     const IW=incomingWave();waves.forEach(W=>W.hot=W===IW);
     timeScale=IW?1:6; // skip the flat spells between sets
     if(msgT>0){msgT-=raw;if(msgT<=0)setPrompt(null)}
     if(msgT<=0&&P.flat)setPrompt(`It's flat at ${P.name} today. Open the <b>Forecast</b> to find waves.`,true);
+    else if(msgT<=0&&heatWatch())setPrompt(`<b>${HEAT.opp.name.replace(/[<>&]/g,"")} is riding.</b> Watching from the channel. It swings back when your next set comes.`);
+    else if(msgT<=0&&HEAT&&HEAT.over)setPrompt("<b>Hooter.</b> The heat is over. Waiting for the final scores…");
     else if(msgT<=0){const W=incomingWave();setPrompt(W?(isPhone?"<b>Set incoming.</b> Tap the wave where you want to take off.":"<b>Set incoming.</b> Click the wave where you want to take off."):"Sitting in the lineup. Waiting for a set…")}
   }
   if(mode==="ride")stepRide(dt,raw);
@@ -2398,7 +2488,7 @@ function unequipSlot(slot){delete career.gear.eq[slot];saveCareer();refreshOutfi
 function gearLook(){const eq=career.gear.eq,top=eq.top&&GEAR_BY[eq.top],suit=eq.suit&&GEAR_BY[eq.suit],sh=eq.shorts&&GEAR_BY[eq.shorts],hat=eq.hat&&GEAR_BY[eq.hat];
   return {top:suit?suit.col.suit:top?top.col.top:lookBase.rash,trim:suit?suit.col.trim:top?top.col.trim:lookBase.trim,shorts:suit?suit.col.suit:sh?sh.col.shorts:lookBase.shorts,
     full:!!(suit&&suit.kind==="full"),suit:suit?suit.col.suit:null,hat:hat?hat.col.hat:null}}
-function refreshOutfit(){const eq=career.gear.eq;styleRider(rig,lookFor(eq));
+function refreshOutfit(){const eq=career.gear.eq;styleRider(rig,HEAT?heatLook():lookFor(eq));
   leash.material.color.set(eq.leash&&GEAR_BY[eq.leash]?GEAR_BY[eq.leash].ink:"#111a24");
   if(boardMesh&&boardMesh.parent===surfer&&mode!=="ride"&&mode!=="wipe"&&boardMesh.userData.acc!==JSON.stringify(boardAcc(BOARDS[curBoard])))equipBoard(curBoard)}
 function applyLook(L){Object.keys(lookBase).forEach(k=>{if(L[k])lookBase[k]=L[k]});refreshOutfit();
@@ -2522,7 +2612,184 @@ const STUDIO=(()=>{
   return {want,mount,mountBoard,render:k=>{init();return render(k)}};
 })();
 
+
+/* =====================================================================
+   1 v 1 HEATS: two players, one break, the same waves, live.
+   The inviter hosts: it sends out every new wave so both lineups see the same set.
+   Unridden waves on their way in follow a shared clock; a wave someone paddles for
+   or rides follows that player's own copy. Priority decides who gets a contested wave.
+   ===================================================================== */
+const HEAT_MS=600000, HEAT_VIN=.9;
+let heatSend=null;
+const JERSEY={red:{c:"#d8262c",n:"Red"},blue:{c:"#1f5fd6",n:"Blue"},yellow:{c:"#f2c018",n:"Yellow"},white:{c:"#f4f4f2",n:"White"}};
+const heatNow=()=>HEAT?performance.now()-HEAT.t0:0;
+const heatClockZ=W=>SPAWN_Z+HEAT_VIN*(heatNow()-W.at)/1000;
+function heatSpawn(id,at,seed){
+  if(waves.some(W=>W.hid===id))return;
+  const W=makeWave(SPAWN_Z);W.hid=id;W.at=at;W.seed=seed;W.clock=true;W.z=heatClockZ(W);updateWave(W,simT);W.dirty=false;waves.push(W);
+  if(waves.length>5){const old=waves.find(w=>w.peeling&&w!==rideW&&!w.remote&&w!==W);if(old){disposeWave(old);waves=waves.filter(w=>w!==old)}}
+}
+function jerseyLook(j){const L=Object.assign({},lookFor(career.gear.eq));L.top=JERSEY[j].c;L.topBrand="";L.trim=j==="white"?"#1d2b3a":"#ffffff";return L}
+function heatLook(){return jerseyLook(HEAT.me.jersey)}
+function heatDressMe(){styleRider(rig,heatLook())}
+function nameSprite(txt,col){const c=document.createElement("canvas");c.width=256;c.height=64;const x=c.getContext("2d");
+  x.fillStyle="rgba(10,10,14,.6)";x.beginPath();x.roundRect?x.roundRect(8,10,240,44,22):x.rect(8,10,240,44);x.fill();
+  x.fillStyle=col;x.beginPath();x.arc(36,32,10,0,7);x.fill();x.fillStyle="#fff";x.font="700 26px Archivo, Arial, sans-serif";x.textBaseline="middle";x.fillText(txt.slice(0,14),56,33);
+  const s=new THREE.Sprite(new THREE.SpriteMaterial({map:new THREE.CanvasTexture(c),depthTest:false,transparent:true}));s.scale.set(1.6,.4,1);s.renderOrder=9;return s}
+function buildGhost(o){
+  const g={rig:makeRider(),board:null,tag:nameSprite(o.name,JERSEY[o.jersey].c),has:false,j:null,rp:new THREE.Vector3(),rq:new THREE.Quaternion(),bp:new THREE.Vector3(),bq:new THREE.Quaternion(),pp:new THREE.Vector3(),last:0,lastPos:new THREE.Vector3(),spd:0};
+  styleRider(g.rig,o.look);
+  let spec=BOARDS[o.board];if(o.design)try{spec=customSpec(o.design,"opp_custom")}catch(e){}if(!spec)spec=BOARDS.starter;
+  g.board=makeBoard(spec,o.acc||{},{stock:true});g.rig.root.visible=g.board.visible=g.tag.visible=false;
+  scene.add(g.rig.root);scene.add(g.board);scene.add(g.tag);
+  g.joints=[g.rig.pelvis,g.rig.torso,g.rig.neck,g.rig.armL.piv,g.rig.armR.piv,g.rig.foreL.piv,g.rig.foreR.piv,g.rig.thighL.piv,g.rig.thighR.piv,g.rig.shinL.piv,g.rig.shinR.piv];
+  return g}
+function dropGhost(){const g=HEAT&&HEAT.ghost;if(!g)return;[g.rig.root,g.board,g.tag].forEach(o=>{scene.remove(o);disposeObj(o)});HEAT.ghost=null}
+const r3=v=>Math.round(v*1000)/1000;
+function heatOwned(){return mode==="ride"||mode==="wipe"&&ride?ride.W:mode==="ring"?ringW:mode==="paddle"&&target?target.W:null}
+function heatSendState(){
+  const W=heatOwned();surfer.updateMatrixWorld(true);
+  const rp=rig.root.getWorldPosition(tmpV),rq=rig.root.getWorldQuaternion(tmpQ);
+  const bp=boardMesh.getWorldPosition(new THREE.Vector3()),bq=boardMesh.getWorldQuaternion(new THREE.Quaternion());
+  const j=[];JOINTS.forEach(o=>j.push(r3(o.rotation.x),r3(o.rotation.y),r3(o.rotation.z)));j.push(r3(rig.pelvis.position.x),r3(rig.pelvis.position.y),r3(rig.pelvis.position.z));
+  heatSend({t:"st",m:mode,ht:Math.round(heatNow()),wid:W&&W.hid!=null&&waves.includes(W)?W.hid:null,wz:W?r3(W.z):0,wpx:W?r3(W.peelX):0,wpk:W?W.peeling:false,
+    rp:[r3(rp.x),r3(rp.y),r3(rp.z)],rq:[r3(rq.x),r3(rq.y),r3(rq.z),r3(rq.w)],bp:[r3(bp.x),r3(bp.y),r3(bp.z)],bq:[r3(bq.x),r3(bq.y),r3(bq.z),r3(bq.w)],j,vis:rig.root.visible!==false});
+}
+function heatPrioLabel(){return HEAT.prio==="me"?HEAT.me.name:HEAT.prio==="opp"?HEAT.opp.name:null}
+/* priority: when both of you go for the same wave, whoever has priority keeps it */
+function heatLosesWave(W){
+  if(!HEAT||W.hid==null)return null;
+  const oc=HEAT.oppClaim;
+  if(W.oppTook)return `${HEAT.opp.name} was already riding this wave.`;
+  if(!oc||oc.id!==W.hid)return null;
+  if(HEAT.prio==="opp")return `${HEAT.opp.name} had priority on this wave, so you had to pull back.`;
+  if(HEAT.prio==="me")return null;
+  return oc.at<HEAT.myClaimAt?`${HEAT.opp.name} was in position first and got the wave.`:null;
+}
+function heatUsedWave(){if(!HEAT)return;HEAT.prio="opp";HEAT.myWaves++;heatSend({t:"took",id:ringW&&ringW.hid,z:ringW?r3(ringW.z):0,px:ringW?r3(ringW.peelX):0});heatBoard()}
+function heatScore(s){if(!HEAT)return;HEAT.scores.me.push(+s.toFixed(2));heatSend({t:"score",s:+s.toFixed(2),n:HEAT.scores.me.length});heatBoard();if(HEAT.finished)heatEndCard();else if(HEAT.over)heatMaybeFinish()}
+const best2=a=>a.slice().sort((x,y)=>y-x).slice(0,2);
+const heatTotal=a=>best2(a).reduce((s,x)=>s+x,0);
+function heatOnMsg(m){
+  if(!HEAT)return;HEAT.oppSeen=performance.now();
+  if(m.t==="spawn"){heatSpawn(m.id,m.at,m.seed);return}
+  if(m.t==="clock"){const est=performance.now()-m.ht-HEAT.lag;if(Math.abs(est-HEAT.t0)>400)HEAT.t0=est;return}
+  if(m.t==="claim"){HEAT.oppClaim={id:m.id,at:m.at};return}
+  if(m.t==="took"){HEAT.prio="me";HEAT.oppWaves++;HEAT.oppClaim=null;const W=waves.find(w=>w.hid===m.id);
+    if(W){W.oppTook=true;W.clock=false;if(W!==heatOwned()){W.remote=true;W.rz=m.z;W.rpx=m.px;W.rpk=true;W.rvz=0;W.rvpx=0;W.rt=performance.now();if(!W.peeling){W.peeling=true;W.peelX=m.px}}}
+    if(mode==="paddle"&&target&&target.W===W){missWave(`${HEAT.opp.name} caught this wave first.`);popText("Priority",HEAT.opp.name+" got it")}
+    heatBoard();return}
+  if(m.t==="score"){HEAT.scores.opp.push(m.s);heatBoard();popText(`${HEAT.opp.name}: ${m.s.toFixed(2)}`,"");if(HEAT.finished)heatEndCard();else if(HEAT.over)heatMaybeFinish();return}
+  if(m.t==="done"){HEAT.oppDone=true;heatMaybeFinish();return}
+  if(m.t==="quit"){heatFinish("forfeit");return}
+  if(m.t==="st"){
+    const g=HEAT.ghost;if(!g)return;
+    g.tp=m;g.has=true;const now=performance.now();
+    if(m.ht!=null&&!HEAT.host){const est=now-m.ht-HEAT.lag;if(est>HEAT.t0+300||est<HEAT.t0-300)HEAT.t0=est}
+    waves.forEach(W=>{if(W.remote&&W.hid!==m.wid&&!W.oppTook)W.remote=false});
+    if(m.wid!=null){const W=waves.find(w=>w.hid===m.wid);
+      if(W&&W!==heatOwned()){const dt=Math.max(.05,(now-(W.rt||now))/1000);if(W.remote){W.rvz=(m.wz-W.rz)/dt;W.rvpx=(m.wpx-W.rpx)/dt}else{W.rvz=0;W.rvpx=0}
+        W.remote=true;W.clock=false;W.rz=m.wz;W.rpx=m.wpx;W.rt=now;if(m.wpk&&!W.peeling){W.peeling=true;W.peelX=m.wpx}}}
+    if(m.m!=="ride"&&m.m!=="wipe"&&m.m!=="ring"){waves.forEach(W=>{if(W.oppTook&&W.remote&&m.wid!==W.hid){W.remote=false}})}
+  }
+}
+/* the opponent's wave follows their copy: ease toward what they last sent, carried on by its speed */
+function heatMoveRemote(W,dt){const age=Math.min(.6,(performance.now()-(W.rt||0))/1000),k=Math.min(1,dt*8);
+  W.z+=((W.rz+(W.rvz||0)*age)-W.z)*k;if(W.peeling)W.peelX+=((W.rpx+(W.rvpx||0)*age)-W.peelX)*k}
+function heatGhostStep(dt){
+  const g=HEAT.ghost;if(!g||!g.has)return;const m=g.tp,k=Math.min(1,dt*14);
+  const show=m.vis&&(m.m!=="result"||true);g.rig.root.visible=g.board.visible=g.tag.visible=show;
+  const rp=new THREE.Vector3().fromArray(m.rp),bp=new THREE.Vector3().fromArray(m.bp);
+  // both of you sit in the same spot in the lineup: shuffle them a few metres apart there
+  if((m.m==="lineup"||m.m==="result")&&(mode==="lineup"||mode==="result")&&Math.abs(rp.x-surfer.position.x)<3.5){const off=-P.dir*4;rp.x+=off;bp.x+=off}
+  if(!g.init){g.rp.copy(rp);g.bp.copy(bp);g.init=true}
+  g.rp.lerp(rp,k);g.bp.lerp(bp,k);g.rq.slerp(tmpQ.fromArray(m.rq),k);g.bq.slerp(new THREE.Quaternion().fromArray(m.bq),k);
+  g.rig.root.position.copy(g.rp);g.rig.root.quaternion.copy(g.rq);g.board.position.copy(g.bp);g.board.quaternion.copy(g.bq);
+  g.joints.forEach((o,i)=>{const r=o.rotation;r.set(r.x+wrapA(m.j[i*3]-r.x)*k,r.y+wrapA(m.j[i*3+1]-r.y)*k,r.z+wrapA(m.j[i*3+2]-r.z)*k)});
+  const n=g.joints.length*3;g.rig.pelvis.position.set(m.j[n],m.j[n+1],m.j[n+2]);
+  g.tag.position.set(g.rp.x,g.rp.y+2.1,g.rp.z);
+  const sp=g.bp.distanceTo(g.lastPos)/Math.max(dt,1e-3);g.lastPos.copy(g.bp);g.spd+=(sp-g.spd)*Math.min(1,dt*4);
+  if(m.m==="ride"&&g.spd>6&&spray){const n2=Math.min(6,Math.floor(g.spd/4));for(let i=0;i<n2;i++)sprayEmit(g.bp.x+(Math.random()-.5)*.5,g.bp.y+.05,g.bp.z+.3,(Math.random()-.5)*2,1.2+Math.random()*2,1+Math.random()*2,.4+Math.random()*.3,.1+Math.random()*.14)}
+}
+const fmtClock=ms=>{const s=Math.max(0,Math.ceil(ms/1000));return `${Math.floor(s/60)}:${String(s%60).padStart(2,"0")}`};
+const flagImg=c=>`<img class="hflag" src="https://flagcdn.com/w40/${(c||"au").toLowerCase()}.png" alt="${(c||"AU").toUpperCase()}" width="22" height="15">`;
+function heatBoard(){
+  const el=document.getElementById("heatBoard");if(!el||!HEAT)return;
+  const rows=[["me",HEAT.me,HEAT.scores.me,HEAT.myWaves],["opp",HEAT.opp,HEAT.scores.opp,HEAT.oppWaves]];
+  const tot={me:heatTotal(HEAT.scores.me),opp:heatTotal(HEAT.scores.opp)};
+  const order=HEAT.host?rows:[rows[1],rows[0]];
+  const left=HEAT_MS-heatNow();
+  el.innerHTML=`<div class="hb-head"><b>1 v 1 · ${P.name}</b><span class="hb-live">${HEAT.over?"FINISHED":`<i></i>LIVE · ${fmtClock(left)}`}</span></div>`+
+   order.map(([k,p,sc,n])=>{const b=best2(sc),other=k==="me"?tot.opp:tot.me,mine=k==="me"?tot.me:tot.opp,bestOne=b[0]||0;
+     const need=mine<other?Math.max(.01,other-bestOne+.01):0;
+     return `<div class="hb-row"><span class="hb-jer" style="background:${JERSEY[p.jersey].c}">${(p.name[0]||"?").toUpperCase()}</span>
+      <div class="hb-who"><b>${p.name.replace(/[<>&]/g,"")}${HEAT.prio===k?'<span class="hb-p" title="Priority">P</span>':""}${need?`<span class="hb-need">${need>10?"COMBO":"NEEDS "+need.toFixed(2)}</span>`:""}</b>
+      <span>${flagImg(p.country)} · ${n} wave${n===1?"":"s"}</span></div>
+      <span class="hb-s">${b[0]!=null?b[0].toFixed(2):"–"}<small>1st wave</small></span><span class="hb-s">${b[1]!=null?b[1].toFixed(2):"–"}<small>2nd wave</small></span><span class="hb-s hb-t">${mine.toFixed(2)}<small>Total</small></span></div>`}).join("");
+}
+function heatTick(raw){
+  const now=heatNow();
+  HEAT.sendT-=raw;const busy=mode==="paddle"||mode==="ring"||mode==="ride"||mode==="wipe";
+  if(HEAT.sendT<=0){HEAT.sendT=busy?.12:.4;heatSendState()}
+  if(HEAT.host){HEAT.clockT-=raw;if(HEAT.clockT<=0){HEAT.clockT=3;heatSend({t:"clock",ht:Math.round(now)})}
+    if(!HEAT.over){const unbroken=waves.filter(W=>!W.peeling).length;
+      if(unbroken===0&&now-HEAT.lastSpawn>2500){const id=HEAT.nextId++,seed=Math.random()*100;HEAT.lastSpawn=now;heatSpawn(id,Math.round(now),seed);heatSend({t:"spawn",id,at:Math.round(now),seed})}}}
+  waves.forEach(W=>{const o=heatOwned();if(W===o&&W.clock)W.clock=false});
+  heatGhostStep(raw);
+  HEAT.uiT-=raw;if(HEAT.uiT<=0){HEAT.uiT=.25;heatBoard()}
+  if(!HEAT.over&&now>=HEAT_MS){HEAT.over=true;popText("Hooter","Heat over");heatBoard();
+    if(mode==="lineup"||mode==="paddle"){if(mode==="paddle")resetLineup();}
+    heatMaybeFinish()}
+  if(HEAT.over&&!HEAT.sentDone&&mode!=="ride"&&mode!=="ring"&&mode!=="wipe"&&mode!=="paddle"){HEAT.sentDone=true;heatSend({t:"done"});heatMaybeFinish()}
+  if(!HEAT.finished&&performance.now()-HEAT.oppSeen>45000)heatFinish("lost");
+  if(HEAT.over&&!HEAT.finished&&now>HEAT_MS+90000)heatFinish();
+}
+/* watch the opponent's ride from the lineup, until a wave of your own is on its way */
+function heatWatch(){if(!HEAT||!HEAT.ghost||!HEAT.ghost.has)return false;const m=HEAT.ghost.tp.m;if(m!=="ride"&&m!=="wipe")return false;
+  const IW=incomingWave();return !(IW&&IW.z>SPAWN_Z+14)}
+function heatMaybeFinish(){if(HEAT&&HEAT.over&&HEAT.sentDone&&HEAT.oppDone&&!HEAT.finished)heatFinish()}
+function heatFinish(why){
+  if(!HEAT||HEAT.finished)return;HEAT.finished=true;HEAT.over=true;HEAT.why=why;setTimeout(()=>{if(HEAT)clearInterval(HEAT.hb)},8000);heatEndCard(true)}
+function heatEndCard(first){
+  if(!HEAT||!HEAT.finished)return;const why=HEAT.why;
+  const a=heatTotal(HEAT.scores.me),b=heatTotal(HEAT.scores.opp);
+  let res=why==="forfeit"?"win":why==="lost"?"win":a>b?"win":a<b?"loss":(best2(HEAT.scores.me)[0]||0)>(best2(HEAT.scores.opp)[0]||0)?"win":(best2(HEAT.scores.me)[0]||0)<(best2(HEAT.scores.opp)[0]||0)?"loss":"draw";
+  const why2=why==="forfeit"?`${HEAT.opp.name} left the heat.`:why==="lost"?`Lost contact with ${HEAT.opp.name}.`:"";
+  heatBoard();
+  const o=document.getElementById("heatEnd");
+  o.innerHTML=`<div class="card"><span class="label">1 v 1 heat · ${P.name}</span><h2>${res==="win"?"You won!":res==="loss"?`${HEAT.opp.name.replace(/[<>&]/g,"")} won`:"It's a draw"}</h2>${why2?`<p class="why">${why2}</p>`:""}
+    <div class="he-scores"><div><span style="background:${JERSEY[HEAT.me.jersey].c}"></span><b>${HEAT.me.name.replace(/[<>&]/g,"")}</b><em>${a.toFixed(2)}</em></div><div><span style="background:${JERSEY[HEAT.opp.jersey].c}"></span><b>${HEAT.opp.name.replace(/[<>&]/g,"")}</b><em>${b.toFixed(2)}</em></div></div>
+    ${HEAT.note?`<p class="he-note">${HEAT.note}</p>`:""}<button class="b primary" id="heatExit">Back to the menu</button></div>`;
+  o.hidden=false;document.getElementById("heatExit").onclick=()=>{heatStop();location.hash="#home"};
+  if(first&&window.SQ&&SQ.onHeatEnd)try{const r=SQ.onHeatEnd({res,me:a,opp:b,why,t:heatNow(),brk:breakId,id:HEAT.id,host:HEAT.host,opp_:HEAT.opp,me_:HEAT.me});if(r&&r.note){HEAT.note=r.note;heatEndCard(false)}}catch(e){console.warn(e)}
+}
+function heatStart(cfg,send){
+  if(HEAT)heatStop(true);
+  heatSend=send;
+  HEAT=Object.assign({},cfg,{t0:performance.now()-(cfg.t||0),lag:cfg.lag||80,scores:{me:[],opp:[]},prio:null,oppClaim:null,myClaimAt:0,lastSpawn:-1e9,nextId:1,ghost:null,
+    oppSeen:performance.now(),over:false,finished:false,oppDone:false,sentDone:false,sendT:0,clockT:0,uiT:0,myWaves:0,oppWaves:0,savedBreak:breakId});
+  breakId=cfg.brk;HEAT.P=cfg.P;applyConditions();applyColours();buildLand();buildOcean();
+  waves.forEach(disposeWave);waves=[];resetLineup();renderBreaks();syncSize();
+  heatDressMe();HEAT.ghost=buildGhost(cfg.opp);
+  HEAT.hb=setInterval(()=>{if(heatSend)heatSend({t:"hb"})},2000);   // keeps the connection alive even while the tab is busy
+  document.body.classList.add("in-heat");document.getElementById("heatEnd").hidden=true;
+  heatBoard();popText("1 v 1 heat",`You're in ${JERSEY[cfg.me.jersey].n.toLowerCase()} · 10 minutes`);
+}
+function heatStop(silent){
+  if(!HEAT)return;const back=HEAT.savedBreak;clearInterval(HEAT.hb);
+  if(!HEAT.finished&&!silent&&heatSend)try{heatSend({t:"quit"})}catch(e){}
+  dropGhost();HEAT=null;heatSend=null;document.body.classList.remove("in-heat");
+  const he=document.getElementById("heatEnd");if(he)he.hidden=true;
+  refreshOutfit();setBreak(career.loc&&BREAKS[career.loc]?career.loc:back||"snapper");
+}
+
 window.SQ={
+  heat:{start:heatStart,stop:heatStop,onMsg:heatOnMsg,get active(){return !!HEAT},get finished(){return !!(HEAT&&HEAT.finished)},
+    kit(j){return {look:jerseyLook(j),board:curBoard,design:career.custom&&career.custom[curBoard]||null,acc:boardAcc(BOARDS[curBoard]),stance}},
+    conditions(){return {H:Math.max(1.2,P.H),hollow:P.hollow,crumble:P.crumble||0,peel:P.peel,offshore:P.offshore||0,flat:false,storm:false,chop:uniforms.uChop.value}},
+    conditionsFor(id){if(!BREAKS[id]||HEAT)return null;const sb=breakId,sP=P,sc=uniforms.uChop.value,sco=cond;breakId=id;applyConditions();
+      const out={H:Math.max(1.2,Math.min(P.H,career.stormUntil>Date.now()?P.H:P.H)),hollow:P.hollow,crumble:P.crumble||0,peel:P.peel,offshore:P.offshore||0,flat:false,storm:false,chop:uniforms.uChop.value};
+      breakId=sb;P=sP;uniforms.uChop.value=sc;cond=sco;renderTag();return out}},
   get career(){return career},saveCareer,renderCareer,BOARDS,BREAKS,CATS,catTag,xpToNext,rewardFor,
   get breakId(){return breakId},
   setBreak(id){if(BREAKS[id])setBreak(id)},
@@ -2540,7 +2807,7 @@ window.SQ={
   onRide:null
 };
 requestAnimationFrame(frame);
-window.__sq={get dir(){return P.dir},get H(){return P.H},step(n){for(let i=0;i<n;i++)tick(1/30);renderer.render(scene,camera)},get t(){return simT},get wz(){return target&&target.W.z},get mode(){return mode},get ride(){return ride},input,pickAlong(a){const W=incomingWave();if(!W)return false;target={W,x:PEEL_START()+P.dir*a,along:a,stage:0,dzR:99};W.hot=true;W.boost=true;mode="paddle";return true},ringTapPerfect(){ringT=ringZone*1.8/360;ringTap()},setBreak};
+window.__sq={get dir(){return P.dir},get H(){return P.H},step(n){for(let i=0;i<n;i++)tick(1/30);renderer.render(scene,camera)},get t(){return simT},get wz(){return target&&target.W.z},get mode(){return mode},get ride(){return ride},input,pickAlong(a){const W=incomingWave();if(!W)return false;target={W,x:PEEL_START()+P.dir*a,along:a,stage:0,dzR:99};W.hot=true;W.boost=true;mode="paddle";return true},ringTapPerfect(){ringT=ringZone*1.8/360;ringTap()},setBreak,claim(a){const W=incomingWave();if(!W)return false;this.pickAlong(a);if(HEAT){HEAT.myClaimAt=heatNow();W.clock=false;heatSend({t:"claim",id:W.hid,at:Math.round(HEAT.myClaimAt)})}return W.hid},get heat(){return HEAT},get waves(){return waves.map(W=>({id:W.hid,z:+W.z.toFixed(1),pk:W.peeling,px:+W.peelX.toFixed(1),rem:!!W.remote,clk:!!W.clock}))},get prompt(){return document.getElementById("prompt").textContent}};
 })();
 </script>
 
@@ -2626,12 +2893,12 @@ html[data-theme="a"] .btn.primary{background:linear-gradient(90deg,#ffa24c,#ff5f
 .hA-card .ft small{font-size:14px;color:var(--muted)}
 .hA-card .m{font-size:12px;color:var(--muted)}
 .hA-main{padding-block:34px 70px;display:grid;gap:28px}
-.hA-tiles{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:12px}
+.hA-tiles{display:grid;grid-template-columns:repeat(6,minmax(0,1fr));gap:12px}.hA-tile:first-child{grid-column:span 2}
 .hA-tile{position:relative;overflow:hidden;display:grid;align-content:end;gap:4px;min-height:150px;padding:16px;border-radius:16px;text-decoration:none;color:var(--foam);background:linear-gradient(200deg,#3a1f2c,#1e121b 70%);border:1px solid var(--line);transition:transform .15s,border-color .15s}
 .hA-tile:first-child{background:linear-gradient(200deg,#ff8a4c,#c2364f);border:0}
 .hA-tile:first-child .s{color:#ffe3cf}
 .hA-tile:hover{transform:translateY(-3px);border-color:var(--turq)}
-.hA-tile .n{position:absolute;top:8px;right:14px;font-family:var(--f-display);font-weight:900;font-size:56px;line-height:1;color:rgba(255,200,160,.13)}
+.hA-tile .n{position:absolute;top:8px;right:14px;font-family:var(--f-display);font-weight:900;font-size:44px;line-height:1;color:rgba(255,200,160,.13)}
 .hA-tile .t{font-family:var(--f-display);font-weight:800;font-stretch:110%;font-size:18px}
 .hA-tile .s{font-size:13px;color:var(--muted)}
 .hA-row{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:20px;align-items:start}.hA-row>.hA-left{display:grid;gap:20px}
@@ -2861,6 +3128,39 @@ body:not(.in-menu) #menu{display:none}
 @media (max-width:1100px){.shgrid{grid-template-columns:1fr}.shside{position:static}}
 
 .testbox{display:grid;gap:6px;margin-top:6px;padding:10px;border:1px dashed var(--line-strong);border-radius:10px}
+
+/* ===== 1 v 1 heats ===== */
+.flag{border-radius:2px;object-fit:cover;box-shadow:0 0 0 1px rgba(255,255,255,.25);vertical-align:middle;flex:none}
+.ctry{display:flex;align-items:center;gap:10px}
+.ctry select,.hcountry select{flex:1;padding:10px 12px;border-radius:10px;border:1px solid var(--line-strong);background:var(--deep);color:var(--foam);font-size:15px}
+.hcountry{display:grid;gap:8px}
+.hwrap{display:grid;gap:20px}
+.hgrid{display:grid;grid-template-columns:minmax(0,1.2fr) minmax(0,1fr);gap:20px;align-items:start}
+.hlist{list-style:none;margin:0;padding:0;display:grid;gap:8px}
+.hlist li{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:12px 14px;border-radius:12px;background:var(--deep);border:1px solid var(--line)}
+.hlist .who{display:flex;align-items:center;gap:12px;min-width:0}
+.hlist .who b{display:block;font-family:var(--f-display);font-weight:800;font-size:17px}
+.hlist .who small{display:block;color:var(--muted);font-size:13px}
+.hlist li.empty{background:transparent;border-style:dashed}
+.hrules ul{margin:0;padding-left:18px;display:grid;gap:8px;color:#e9d6c8}
+#inviteBox{position:fixed;inset:0;z-index:200;display:grid;place-items:center;background:rgba(8,4,8,.5);font-family:var(--f-body)}
+#inviteBox[hidden]{display:none}
+#inviteBox .icard{width:min(440px,calc(100vw - 32px));background:#21141f;border:1px solid rgba(255,190,150,.3);border-radius:18px;padding:24px;display:grid;gap:12px;color:#fff3e6;box-shadow:0 30px 80px -20px rgba(0,0,0,.7)}
+#inviteBox .ilab{font-family:var(--f-label);font-weight:700;letter-spacing:.14em;text-transform:uppercase;font-size:12px;color:#ffa24c}
+#inviteBox h3{margin:0;font-family:var(--f-display);font-weight:900;font-size:24px;display:flex;align-items:center;gap:10px}
+#inviteBox p{margin:0;color:#e9d6c8}
+#inviteBox .irow{display:flex;gap:10px}
+#inviteBox .inote{font-size:14px;color:#ffd2a8;min-height:1em}
+body.in-heat #prompt{top:auto;bottom:110px}
+
+.h2h,.hrecent{list-style:none;margin:0;padding:0;display:grid;gap:6px}
+.h2h li,.hrecent li{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:8px 12px;border-radius:10px;background:var(--deep);border:1px solid var(--line)}
+.h2h .rec{display:flex;gap:8px;font-family:var(--f-label);font-weight:700;letter-spacing:.06em}
+.h2h .rec i{font-style:normal}.h2h .rec .w{color:var(--good)}.h2h .rec .l{color:var(--bad)}
+.hrecent .res{width:24px;height:24px;border-radius:6px;display:grid;place-items:center;font-family:var(--f-label);font-weight:800;flex:none}
+.hrecent .res.W{background:rgba(74,222,128,.18);color:var(--good)}.hrecent .res.L{background:rgba(248,113,113,.16);color:var(--bad)}.hrecent .res.D{background:rgba(255,255,255,.08)}
+.hrecent li span:nth-child(2){flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.he-note{margin:0;color:#ffd2a8;font-size:15px}
 </style>
 <script>
 (function(){
@@ -2989,15 +3289,16 @@ function boardSVG(colour,label){
 /* ---------- views ---------- */
 const SECTIONS=[
   {id:"play",n:1,t:"Play Surfing",s:"Paddle out at your current break",build:2},
-  {id:"map",n:2,t:"World Map",s:"Travel the tour with tickets",build:5},
-  {id:"forecast",n:3,t:"Daily Forecast",s:"Swell, wind and tide for 7 days",build:4},
-  {id:"boards",n:4,t:"Surfboard Shop",s:"Shortboards to longboards",build:6},
-  {id:"apparel",n:5,t:"Apparel Shop",s:"Boardshorts, wetsuits, hats",build:6},
-  {id:"accessories",n:6,t:"Accessories",s:"Fins, leashes, tailpads",build:6},
-  {id:"shaping",n:7,t:"Shaping Room",s:"Shape and spray your own board",build:8},
-  {id:"profile",n:8,t:"Player Profile",s:"Your surfer, quiver and stats",build:1},
-  {id:"leaderboards",n:9,t:"Leaderboards",s:"Best waves and richest surfers",build:1},
-  {id:"achievements",n:10,t:"Achievements",s:"Milestones and level rewards",build:1}
+  {id:"heats",n:2,t:"1 v 1 Heats",s:"Invite a mate to a live 10-minute heat",build:9},
+  {id:"map",n:3,t:"World Map",s:"Travel the tour with tickets",build:5},
+  {id:"forecast",n:4,t:"Daily Forecast",s:"Swell, wind and tide for 7 days",build:4},
+  {id:"boards",n:5,t:"Surfboard Shop",s:"Shortboards to longboards",build:6},
+  {id:"apparel",n:6,t:"Apparel Shop",s:"Boardshorts, wetsuits, hats",build:6},
+  {id:"accessories",n:7,t:"Accessories",s:"Fins, leashes, tailpads",build:6},
+  {id:"shaping",n:8,t:"Shaping Room",s:"Shape and spray your own board",build:8},
+  {id:"profile",n:9,t:"Player Profile",s:"Your surfer, quiver and stats",build:1},
+  {id:"leaderboards",n:10,t:"Leaderboards",s:"Best waves and richest surfers",build:1},
+  {id:"achievements",n:11,t:"Achievements",s:"Milestones and level rewards",build:1}
 ];
 const ROADMAP=[
   [1,"Foundation","Branding, homepage, player creation, saving, profile, level rewards"],
@@ -3086,10 +3387,12 @@ function homeView(){return homeA()}
 let lbTab="waves-all";
 function leaderboardPanel(tab,headId){
   lbTab=tab||lbTab;
-  const tabs=[["waves-today","Today"],["waves-all","All-time"],["money","Money"],["boards","Boards"],["level","Level"]];
+  const tabs=[["waves-today","Today"],["waves-all","All-time"],["heats","Heats"],["money","Money"],["boards","Boards"],["level","Level"]];
   let rows="";
   const me=state.player.name;
-  if(lbTab.startsWith("waves")){
+  if(lbTab==="heats"){const h=heatRec();
+    rows=`<li class="you"><span class="rk">–</span><span class="who"><b>${esc(me)}</b><span>${h.w} won · ${h.l} lost${h.d?` · ${h.d} drawn`:""}</span></span><span class="val">${Math.round(h.rating)}</span></li>`;
+  }else if(lbTab.startsWith("waves")){
     const list=(lbTab==="waves-today"?EX_TODAY:EX_WAVES).map(r=>Object.assign({ex:true},r));
     if(state.stats.best>0)list.push({n:me,loc:state.stats.bestLoc||curLoc(),s:state.stats.best,t:state.stats.bestTricks||"",you:true});
     list.sort((a,b)=>b.s-a.s);
@@ -3104,10 +3407,13 @@ function leaderboardPanel(tab,headId){
     const sub=r=>key==="money"?`Level ${r.level} · ${r.boards} boards`:key==="boards"?`${money(r.money)} · Level ${r.level}`:`${money(r.money)} · ${r.boards} boards`;
     rows=list.map((r,i)=>`<li class="${r.you?"you":""}"><span class="rk">${i+1}</span><span class="who"><b>${esc(r.n)}${r.ex?'<span class="ex">Example</span>':""}</b><span>${sub(r)}</span></span><span class="val">${fmt(r[key])}</span></li>`).join("");
   }
-  return `<div class="panel-head"><h2 id="${headId||"lb-h2"}">Leaderboards</h2><span class="label">${lbTab.startsWith("waves")?"Best waves":"Wealth & quiver"}</span></div>
+  const live=typeof onlineOn==="function"&&onlineOn()&&!(typeof NET!=="undefined"&&NET.err);
+  if(live)rows=`<li><span class="rk">…</span><span class="who"><b>Loading the live leaderboard…</b><span>Getting everyone's scores</span></span><span class="val"></span></li>`;
+  const note=live?"Connecting to the live leaderboard…":(typeof NET!=="undefined"&&NET.err)?"Couldn't reach the online leaderboard, so these are example rows. If you're on a school or work network it may be blocking supabase.co.":"Example rows. Real players appear here once online play is switched on and you sign in.";
+  return `<div class="panel-head"><h2 id="${headId||"lb-h2"}">Leaderboards</h2><span class="label">${lbTab.startsWith("waves")?"Best waves":lbTab==="heats"?"Heat rankings":"Wealth & quiver"}</span></div>
     <div class="tabs" role="tablist">${tabs.map(([id,l])=>`<button class="tab" role="tab" aria-selected="${id===lbTab}" data-lb="${id}">${l}</button>`).join("")}</div>
     <ol class="board-list">${rows}</ol>
-    <p class="note">Example rows. Real players appear here once online play is switched on and you sign in.</p>`;
+    <p class="note">${note}</p>`;
 }
 
 function leaderboardsView(){
@@ -3203,6 +3509,7 @@ function comingView(id){
 }
 
 /* ---------- character creator ---------- */
+const COUNTRIES=[["au", "Australia"], ["nz", "New Zealand"], ["us", "United States"], ["br", "Brazil"], ["za", "South Africa"], ["fr", "France"], ["pt", "Portugal"], ["es", "Spain"], ["jp", "Japan"], ["id", "Indonesia"], ["pe", "Peru"], ["cl", "Chile"], ["mx", "Mexico"], ["cr", "Costa Rica"], ["pf", "French Polynesia"], ["fj", "Fiji"], ["ph", "Philippines"], ["it", "Italy"], ["de", "Germany"], ["gb", "United Kingdom"], ["ie", "Ireland"], ["ca", "Canada"], ["ar", "Argentina"], ["uy", "Uruguay"], ["ec", "Ecuador"], ["sv", "El Salvador"], ["ni", "Nicaragua"], ["pa", "Panama"], ["ma", "Morocco"], ["sn", "Senegal"], ["lk", "Sri Lanka"], ["in", "India"], ["cn", "China"], ["kr", "South Korea"], ["tw", "Taiwan"], ["th", "Thailand"], ["my", "Malaysia"], ["sg", "Singapore"], ["ws", "Samoa"], ["to", "Tonga"], ["nl", "Netherlands"], ["be", "Belgium"], ["se", "Sweden"], ["no", "Norway"], ["dk", "Denmark"], ["il", "Israel"], ["tr", "Turkey"], ["gr", "Greece"], ["ae", "United Arab Emirates"], ["ng", "Nigeria"], ["gh", "Ghana"], ["ke", "Kenya"], ["mu", "Mauritius"], ["re", "R\u00e9union"], ["pr", "Puerto Rico"], ["ve", "Venezuela"], ["co", "Colombia"]];
 let draft=null, step=0, editing=false;
 const STEP_NAMES=["Name","Hair & skin","Face","Stance & kit"];
 function creatorView(){
@@ -3215,6 +3522,9 @@ function creatorView(){
     body=`<div class="field"><label class="label" for="pname">Surfer name</label>
       <input type="text" id="pname" maxlength="16" autocomplete="off" spellcheck="false" value="${esc(d.name)}" placeholder="e.g. northpoint_nat" ${editing?"disabled":""}>
       <span class="hint" id="namehint">${editing?"Your name is fixed so other players can identify you.":"3–16 characters: letters, numbers, dot, dash or underscore. This is how other players will see you."}</span></div>
+      <div class="field"><label class="label" for="pcountry">Country</label>
+      <div class="ctry"><img class="flag" id="pflag" src="https://flagcdn.com/w40/${esc(d.country||"au")}.png" alt="" width="30" height="20"><select id="pcountry">${COUNTRIES.map(([c,n])=>`<option value="${c}" ${c===(d.country||"au")?"selected":""}>${esc(n)}</option>`).join("")}</select></div>
+      <span class="hint">Your flag shows next to your name in 1 v 1 heats.</span></div>
       <div class="field"><span class="label">Everyone starts equal</span>
       <div class="fair">
         <div><span class="label">Money</span><b>${money(START.money)}</b></div>
@@ -3521,10 +3831,15 @@ function mapView(){
 }
 
 /* ---------- router ---------- */
-const VIEWS=new Set(["home","profile","leaderboards","achievements","create","look","play","map","forecast","boards","apparel","accessories","shaping","spray","account"]);
+const VIEWS=new Set(["home","profile","leaderboards","achievements","create","look","play","map","forecast","boards","apparel","accessories","shaping","spray","account","heats"]);
 function route(){
   cancelAnimationFrame(raf);
   let v=(location.hash||"#home").slice(1);
+  if(SQ.heat.active&&v!=="play"){
+    if(SQ.heat.finished||confirm("Leave the heat? You'll forfeit it.")){SQ.heat.stop();leaveHeatCh()}
+    else{location.hash="#play";return}
+  }
+  else if(!SQ.heat.active&&typeof LOBBY!=="undefined"&&LOBBY.heatCh&&v!=="play")leaveHeatCh();
   if(!VIEWS.has(v))v="home";
   if(!state&&v!=="create"){ if(location.hash!=="#create"){location.hash="#create";return} v="create"; }
   if(state&&v==="create")v="home";
@@ -3532,7 +3847,7 @@ function route(){
   document.body.classList.add("in-menu");
   const app=$("#app");
   if(v==="create"){
-    if(!draft||editing){editing=false;step=0;draft={name:"",hair:"short",hairColour:"Salt blond",skin:"Tan",eyes:"round",brows:"straight",facial:"none",zinc:"nose",stance:"regular",kit:"navy",boardColour:"#1d6fc4"}}
+    if(!draft||editing){editing=false;step=0;draft={name:"",country:"au",hair:"short",hairColour:"Salt blond",skin:"Tan",eyes:"round",brows:"straight",facial:"none",zinc:"nose",stance:"regular",kit:"navy",boardColour:"#1d6fc4"}}
     app.innerHTML=creatorView();
   }else if(v==="look"){
     if(!editing){editing=true;step=1;draft=Object.assign({},state.player)}
@@ -3545,6 +3860,7 @@ function route(){
   else if(v==="boards"||v==="apparel"||v==="accessories")app.innerHTML=shopView(v);
   else if(v==="shaping"){app.innerHTML=shapingView();requestAnimationFrame(shMount)}
   else if(v==="account")app.innerHTML=accountView();
+  else if(v==="heats")app.innerHTML=heatsView();
   else if(v==="spray"){app.innerHTML=sprayView();requestAnimationFrame(spMount)}
   else app.innerHTML=comingView(v);
   purse();
@@ -3586,7 +3902,7 @@ document.addEventListener("click",e=>{
   if(a==="next"){if(step===0&&!editing&&!checkName())return;step++;$("#app").innerHTML=creatorView()}
   else if(a==="prev"){step=Math.max(0,step-1);$("#app").innerHTML=creatorView()}
   else if(a==="finish"){
-    if(editing){Object.assign(state.player,draft,{name:state.player.name,stance:state.player.stance});save();syncSurfer();editing=false;toast("Look saved");location.hash="#profile"}
+    if(editing){Object.assign(state.player,draft,{name:state.player.name,stance:state.player.stance});if(typeof lobbyUpdate==="function")lobbyUpdate();save();syncSurfer();editing=false;toast("Look saved");location.hash="#profile"}
     else{if(!checkName()){step=0;$("#app").innerHTML=creatorView();return}
       state=freshState(Object.assign({},draft));SQ.resetCareer();save();syncSurfer();draft=null;toast("Welcome to the lineup, "+state.player.name);location.hash="#home"}
   }
@@ -3610,6 +3926,7 @@ document.addEventListener("click",e=>{
 document.addEventListener("keydown",e=>{if((e.key==="Enter"||e.key===" ")&&e.target.matches("[data-go]")){e.preventDefault();location.hash="#"+e.target.dataset.go}
   if((e.key==="Enter"||e.key===" ")&&e.target.matches("[data-mapsel]")){e.preventDefault();e.target.dispatchEvent(new MouseEvent("click",{bubbles:true}))}});
 document.addEventListener("input",e=>{
+  if(e.target.id==="pcountry"&&draft){draft.country=e.target.value;const f=$("#pflag");if(f)f.src=`https://flagcdn.com/w40/${draft.country}.png`}
   if(e.target.id==="pname"&&draft){draft.name=e.target.value.trim();refreshPreview();const h=$("#namehint");h.classList.remove("err");h.textContent="3–16 characters: letters, numbers, dot, dash or underscore. This is how other players will see you."}
 });
 function checkName(){
@@ -4026,23 +4343,28 @@ const NET_DOWN="Couldn't reach the online service. Check your internet and try a
 const mailOf=n=>n.toLowerCase()+"@players.swellquest.game";
 function netLoad(){return new Promise(res=>{if(!onlineOn())return res(false);if(window.supabase)return res(true);
   const s=document.createElement("script");s.src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.117.3/dist/umd/supabase.js";
-  s.onload=()=>res(!!window.supabase);s.onerror=()=>{NET.err="Couldn't reach the online service.";res(false)};document.head.appendChild(s)})}
+  s.onload=()=>res(!!window.supabase);let done=false;const fail=()=>{if(done)return;done=true;NET.err="Couldn't reach the online service.";res(false);if(document.querySelector(".board-list")||location.hash==="#account")route()};
+  s.onerror=fail;setTimeout(()=>{if(!window.supabase)fail()},10000);document.head.appendChild(s)})}
 async function netInit(){
   if(!await netLoad())return;
   try{NET.client=window.supabase.createClient(ONLINE.url,ONLINE.key,{auth:{persistSession:true,autoRefreshToken:true}});
     const {data}=await NET.client.auth.getSession();if(data&&data.session){NET.user=data.session.user;await netWho()}
-    NET.ready=true}catch(e){NET.err="Online service error.";console.warn(e)}
+    NET.ready=true;lobbyJoin()}catch(e){NET.err=netDown(e)?NET_DOWN:"Online service error.";console.warn(e)}
   purse();if(location.hash==="#leaderboards"||location.hash==="#account"||location.hash==="#home"||!location.hash)route();
 }
 async function netWho(){const {data}=await NET.client.from("profiles").select("username").eq("id",NET.user.id).maybeSingle();NET.name=data?data.username:null}
-function pubStats(){const C=SQ.career,s=state.stats;return {level:C.level,money:Math.floor(C.money),best:+(C.best||s.best||0),waves:C.waves||s.waves||0,boards:SQ.quiver().length,best_loc:s.bestLoc||null,best_tricks:s.bestTricks||null,updated_at:new Date().toISOString()}}
+const heatRec=()=>{const C=SQ.career;if(!C.heat)C.heat={w:0,l:0,d:0,rating:1000};return C.heat};
+function pubStats(){const C=SQ.career,s=state.stats,h=heatRec();const o={level:C.level,money:Math.floor(C.money),best:+(C.best||s.best||0),waves:C.waves||s.waves||0,boards:SQ.quiver().length,best_loc:s.bestLoc||null,best_tricks:s.bestTricks||null,updated_at:new Date().toISOString()};
+  if(!NET.noHeatCols)Object.assign(o,{heat_wins:h.w,heat_losses:h.l,heat_draws:h.d,rating:Math.round(h.rating)});return o}
+const missingCol=e=>e&&/heat_|rating|column|schema cache/i.test(e.message||"");
 const bundle=()=>({v:1,s:state,c:SQ.career,t:Date.now()});
 async function netPush(force){
   if(!NET.client||!NET.user||!state)return {ok:false};
   if(!force&&Date.now()-NET.lastPush<15000){NET.dirty=true;return {ok:true,later:true}}
   NET.lastPush=Date.now();NET.dirty=false;
   const a=await NET.client.from("saves").upsert({user_id:NET.user.id,data:bundle(),updated_at:new Date().toISOString()});
-  const b=await NET.client.from("profiles").update(pubStats()).eq("id",NET.user.id);
+  let b=await NET.client.from("profiles").update(pubStats()).eq("id",NET.user.id);
+  if(b.error&&missingCol(b.error)&&!NET.noHeatCols){NET.noHeatCols=true;b=await NET.client.from("profiles").update(pubStats()).eq("id",NET.user.id)}
   if(a.error||b.error){console.warn(a.error||b.error);return {ok:false,msg:"Cloud save failed. Your progress is still saved in this browser."}}
   return {ok:true};
 }
@@ -4068,31 +4390,39 @@ async function netSignUp(name,pass){
   NET.user=data.user;const p=await NET.client.from("profiles").insert(Object.assign({id:NET.user.id,username:name},state?pubStats():{}));
   if(p.error)return p.error.message;NET.name=name;
   if(state&&state.player.name!==name){state.player.name=name;save()}
-  await netAfterLogin();return null}
+  await netAfterLogin();lobbyJoin();return null}
 async function netSignIn(name,pass){
   const {data,error}=await NET.client.auth.signInWithPassword({email:mailOf(name),password:pass});
   if(error)return netDown(error)?NET_DOWN:"Wrong name or password.";NET.user=data.user;await netWho();
   if(!NET.name){const p=await NET.client.from("profiles").insert(Object.assign({id:NET.user.id,username:name},state?pubStats():{}));if(!p.error)NET.name=name}
-  await netAfterLogin();return null}
-async function netSignOut(){if(NET.dirty)await netPush(true);await NET.client.auth.signOut();NET.user=null;NET.name=null}
+  await netAfterLogin();lobbyJoin();return null}
+async function netSignOut(){lobbyLeave();if(NET.dirty)await netPush(true);await NET.client.auth.signOut();NET.user=null;NET.name=null}
 async function netScore(r){
   if(!NET.client||!NET.user||!NET.name||!(r.score>0))return;
-  await NET.client.from("scores").insert({user_id:NET.user.id,username:NET.name,score:Math.round(r.score*100)/100,spot:r.loc,tricks:(r.tricks||"").slice(0,120)});
+  const {error}=await NET.client.from("scores").insert({user_id:NET.user.id,username:NET.name,score:Math.round(Math.min(10,r.score)*100)/100,spot:r.loc,tricks:(r.tricks||"").slice(0,120)});
+  if(error)console.warn("Score not posted:",error.message);
 }
+function netRefreshBoard(){const bl=document.querySelector(".board-list");const menu=document.getElementById("menu");if(bl&&NET.client&&menu&&menu.offsetParent!==null||bl&&NET.client&&document.visibilityState==="visible")netFillBoard()}
+setInterval(()=>{if(document.visibilityState==="visible")netRefreshBoard()},30000);
 async function netBoard(tab){
   if(!NET.client)return null;
   if(tab==="waves-today"){const since=new Date();since.setHours(0,0,0,0);
     const {data,error}=await NET.client.from("scores").select("username,score,spot,tricks").gte("created_at",since.toISOString()).order("score",{ascending:false}).limit(60);
-    if(error)return null;const seen=new Set(),out=[];data.forEach(r=>{if(!seen.has(r.username)){seen.add(r.username);out.push({n:r.username,s:+r.score,loc:r.spot||"",t:r.tricks||""})}});return out.slice(0,25)}
+    if(error){NET.lbErr=netDown(error)?"Couldn't reach supabase.co. A school or work network may be blocking it.":error.message;console.warn(error);return null}const seen=new Set(),out=[];data.forEach(r=>{if(!seen.has(r.username)){seen.add(r.username);out.push({n:r.username,s:+r.score,loc:r.spot||"",t:r.tricks||""})}});return out.slice(0,25)}
+  if(tab==="heats"){const {data,error}=await NET.client.from("profiles").select("username,level,rating,heat_wins,heat_losses,heat_draws").or("heat_wins.gt.0,heat_losses.gt.0,heat_draws.gt.0").order("rating",{ascending:false}).limit(25);
+    if(error){NET.lbErr=missingCol(error)?"Heat rankings need the new database setup. Paste the updated SQL into Supabase to switch them on.":netDown(error)?"Couldn't reach supabase.co. A school or work network may be blocking it.":error.message;console.warn(error);return null}
+    return data.map(r=>({n:r.username,rating:r.rating||1000,w:r.heat_wins||0,l:r.heat_losses||0,d:r.heat_draws||0,level:r.level||1}))}
   const col={"waves-all":"best",money:"money",boards:"boards",level:"level"}[tab];
   const {data,error}=await NET.client.from("profiles").select("username,level,money,best,waves,boards,best_loc,best_tricks").order(col,{ascending:false}).limit(25);
-  if(error)return null;return data.map(r=>({n:r.username,s:+r.best||0,loc:r.best_loc||"",t:r.best_tricks||"",money:+r.money||0,boards:r.boards||0,level:r.level||1}));
+  if(error){NET.lbErr=netDown(error)?"Couldn't reach supabase.co. A school or work network may be blocking it.":error.message;console.warn(error);return null}return data.map(r=>({n:r.username,s:+r.best||0,loc:r.best_loc||"",t:r.best_tricks||"",money:+r.money||0,boards:r.boards||0,level:r.level||1}));
 }
-async function netFillBoard(){const box=document.querySelector(".board-list");if(!box||!NET.client)return;const tab=lbTab,list=await netBoard(tab);if(!list||lbTab!==tab)return;
+async function netFillBoard(){const box=document.querySelector(".board-list");if(!box||!NET.client)return;const tab=lbTab,list=await netBoard(tab);if(lbTab!==tab||!box.isConnected)return;
+  if(!list){const n=box.parentElement.querySelector(".note");box.innerHTML='<li><span class="rk">!</span><span class="who"><b>The leaderboard didn\'t load</b><span>'+esc(NET.lbErr||"Online service error")+'</span></span><span class="val"></span></li>';if(n)n.textContent="Try again in a minute. If it keeps happening, the database setup may need running again.";return}
   const me=NET.name;let rows;
-  if(tab.startsWith("waves"))rows=list.map((r,i)=>`<li class="${r.n===me?"you":""}"><span class="rk">${i+1}</span><span class="who"><b>${esc(r.n)}</b><span>${esc(r.loc)}${r.t?" · "+esc(r.t):""}</span></span><span class="val">${r.s.toFixed(2)}</span></li>`).join("");
+  if(tab==="heats")rows=list.map((r,i)=>`<li class="${r.n===me?"you":""}"><span class="rk">${i+1}</span><span class="who"><b>${esc(r.n)}</b><span>${r.w} won · ${r.l} lost${r.d?` · ${r.d} drawn`:""}</span></span><span class="val">${r.rating}</span></li>`).join("");
+  else if(tab.startsWith("waves"))rows=list.map((r,i)=>`<li class="${r.n===me?"you":""}"><span class="rk">${i+1}</span><span class="who"><b>${esc(r.n)}</b><span>${esc(r.loc)}${r.t?" · "+esc(r.t):""}</span></span><span class="val">${r.s.toFixed(2)}</span></li>`).join("");
   else{const key=tab,fmt=v=>key==="money"?money(v):String(v);rows=list.map((r,i)=>`<li class="${r.n===me?"you":""}"><span class="rk">${i+1}</span><span class="who"><b>${esc(r.n)}</b><span>Level ${r.level} · ${r.boards} board${r.boards===1?"":"s"}</span></span><span class="val">${fmt(r[key])}</span></li>`).join("")}
-  box.innerHTML=rows||'<li><span class="who"><b>No scores yet</b><span>Be the first to post one.</span></span></li>';
+  box.innerHTML=rows||(tab==="heats"?'<li><span class="rk">–</span><span class="who"><b>No heats surfed yet</b><span>Win a 1 v 1 heat to get on the rankings.</span></span><span class="val"></span></li>':'<li><span class="rk">–</span><span class="who"><b>No scores yet</b><span>Be the first to post one.</span></span><span class="val"></span></li>');
   const note=box.parentElement.querySelector(".note");if(note)note.textContent=NET.user?`Live leaderboard. You're signed in as ${NET.name}.`:"Live leaderboard. Sign in to put your own surfer on it."}
 function accountView(){
   const head=`<a class="back" href="#home">← Home</a><div><span class="label">Section 9 · Online</span><h1 style="font-size:clamp(30px,5vw,48px);font-weight:900;font-stretch:118%;margin-top:4px">Online account</h1></div>`;
@@ -4118,7 +4448,180 @@ document.addEventListener("click",async e=>{const b=e.target.closest("[data-net]
   if(err){msg(err);return}toast(`Signed in as ${NET.name}`);purse();location.hash=state?"#home":"#create";route()});
 netInit();
 
-const _onRide=SQ.onRide;SQ.onRide=r=>{_onRide(r);netScore(r);netPush(false)};
+
+/* =====================================================================
+   1 v 1 HEATS: lobby (who's online), invites, and starting a live heat
+   Uses Supabase Realtime presence and broadcast on the same free project. No tables needed.
+   ===================================================================== */
+const LOBBY={ch:null,online:[],busy:false,pending:null,incoming:null,heatCh:null,heat:null};
+const myCountry=()=>(state&&state.player.country)||"au";
+const countryName=c=>(COUNTRIES.find(x=>x[0]===c)||["","Australia"])[1];
+const flagTag=(c,w)=>`<img class="flag" src="https://flagcdn.com/w40/${esc(c||"au")}.png" alt="" width="${w||22}" height="${Math.round((w||22)*.68)}" loading="lazy">`;
+function lobbyMeta(){const h=heatRec();return {id:NET.user.id,name:NET.name,country:myCountry(),level:SQ.career.level,busy:LOBBY.busy,rating:Math.round(h.rating),w:h.w,l:h.l}}
+function lobbyJoin(){
+  if(LOBBY.ch||!NET.client||!NET.user||!NET.name)return;
+  const ch=NET.client.channel("sq-lobby",{config:{presence:{key:NET.user.id},broadcast:{self:false}}});
+  ch.on("presence",{event:"sync"},()=>{const st=ch.presenceState(),out=[];
+    Object.values(st).forEach(arr=>{const m=arr[arr.length-1];if(m&&m.id&&m.id!==NET.user.id)out.push(m)});
+    out.sort((a,b)=>a.name.localeCompare(b.name));LOBBY.online=out;if(location.hash==="#heats")renderHeats()});
+  ch.on("broadcast",{event:"inv"},({payload:p})=>{if(p.to!==NET.user.id)return;
+    if(LOBBY.busy||LOBBY.pending||LOBBY.incoming){ch.send({type:"broadcast",event:"rep",payload:{to:p.from,id:p.id,ok:false,why:"busy"}});return}
+    LOBBY.incoming=p;showInvite(p)});
+  ch.on("broadcast",{event:"rep"},({payload:p})=>{if(p.to!==NET.user.id||!LOBBY.pending||LOBBY.pending.id!==p.id)return;
+    const inv=LOBBY.pending;clearTimeout(inv.timer);LOBBY.pending=null;
+    if(p.ok){closeInvite();hostHeat(inv,p)}else{inviteNote(p.why==="busy"?`${inv.toName} is busy right now.`:`${inv.toName} said no this time.`);setTimeout(closeInvite,2200);if(location.hash==="#heats")renderHeats()}});
+  ch.on("broadcast",{event:"cxl"},({payload:p})=>{if(p.to!==NET.user.id||!LOBBY.incoming||LOBBY.incoming.id!==p.id)return;LOBBY.incoming=null;closeInvite();toast(`${p.fromName} cancelled the invite`)});
+  ch.subscribe(st=>{if(st==="SUBSCRIBED")ch.track(lobbyMeta())});
+  LOBBY.ch=ch;
+}
+function lobbyLeave(){if(LOBBY.ch){try{NET.client.removeChannel(LOBBY.ch)}catch(e){}LOBBY.ch=null;LOBBY.online=[]}}
+function lobbyUpdate(){if(LOBBY.ch)try{LOBBY.ch.track(lobbyMeta())}catch(e){}}
+
+/* ---------- the invite pop-up (shows over the menu and over the game) ---------- */
+function inviteBox(){let b=document.getElementById("inviteBox");if(!b){b=document.createElement("div");b.id="inviteBox";b.hidden=true;document.body.appendChild(b)}return b}
+function closeInvite(){const b=inviteBox();b.hidden=true;b.innerHTML=""}
+function inviteNote(t){const n=document.querySelector("#inviteBox .inote");if(n)n.textContent=t}
+function showInvite(p){
+  const b=inviteBox();b.hidden=false;
+  b.innerHTML=`<div class="icard" role="dialog" aria-labelledby="invT"><span class="ilab">1 v 1 heat invite</span>
+    <h3 id="invT">${flagTag(p.country,26)} ${esc(p.fromName)} wants a heat</h3>
+    <p>10 minutes at <b>${esc(p.breakName)}</b>, ${esc(p.size)}. Best two waves count.</p>
+    <div class="irow"><button class="btn primary" data-inv="yes">Accept</button><button class="btn ghost" data-inv="no">Decline</button></div>
+    <p class="inote" aria-live="polite"></p></div>`;
+  clearTimeout(showInvite.t);showInvite.t=setTimeout(()=>{if(LOBBY.incoming&&LOBBY.incoming.id===p.id){replyInvite(false);inviteNote("")}},30000);
+}
+function replyInvite(ok){const p=LOBBY.incoming;if(!p)return;LOBBY.incoming=null;clearTimeout(showInvite.t);
+  LOBBY.ch.send({type:"broadcast",event:"rep",payload:{to:p.from,id:p.id,ok,kit:ok?myKit():null}});
+  if(ok){inviteNote("Joining the heat…");joinHeat(p)}else closeInvite()}
+function myKit(){return {id:NET.user.id,name:NET.name,country:myCountry(),level:SQ.career.level,rating:Math.round(heatRec().rating)}}
+function sendInvite(to){
+  const o=LOBBY.online.find(x=>x.id===to);if(!o||LOBBY.pending)return;
+  if(o.busy){toast(`${o.name} is in a heat`);return}
+  const brk=SQ.BREAKS[LOBBY.brk]?LOBBY.brk:SQ.breakId,t=SQ.conditions(brk),id=Math.random().toString(36).slice(2,10);
+  const inv={id,to,toName:o.name,from:NET.user.id,fromName:NET.name,country:myCountry(),brk,breakName:SQ.BREAKS[brk].name,size:`${Math.max(4,Math.round(t.r.H*3.28))} ft`};
+  LOBBY.pending=inv;
+  LOBBY.ch.send({type:"broadcast",event:"inv",payload:inv});
+  const b=inviteBox();b.hidden=false;
+  b.innerHTML=`<div class="icard"><span class="ilab">Invite sent</span><h3>${flagTag(o.country,26)} Waiting for ${esc(o.name)}…</h3><p>They have 30 seconds to accept a 10-minute heat at <b>${esc(inv.breakName)}</b>.</p>
+    <div class="irow"><button class="btn ghost" data-inv="cancel">Cancel invite</button></div><p class="inote" aria-live="polite"></p></div>`;
+  inv.timer=setTimeout(()=>{if(LOBBY.pending===inv){LOBBY.pending=null;inviteNote(`${o.name} didn't answer.`);setTimeout(closeInvite,2000)}},32000);
+}
+document.addEventListener("click",e=>{const iv=e.target.closest("[data-invite]");if(iv){sendInvite(iv.dataset.invite);return}
+  const b=e.target.closest("[data-inv]");if(!b)return;const k=b.dataset.inv;
+  if(k==="yes")replyInvite(true);else if(k==="no")replyInvite(false);
+  else if(k==="cancel"&&LOBBY.pending){const p=LOBBY.pending;clearTimeout(p.timer);LOBBY.pending=null;LOBBY.ch.send({type:"broadcast",event:"cxl",payload:{to:p.to,id:p.id,fromName:NET.name}});closeInvite()}
+});
+
+/* ---------- starting the heat ---------- */
+function heatChannel(id,onMsg){const ch=NET.client.channel("sq-heat-"+id,{config:{broadcast:{self:false}}});
+  ch.on("broadcast",{event:"m"},({payload})=>onMsg(payload));return ch}
+function heatSendFn(ch){return msg=>{try{ch.send({type:"broadcast",event:"m",payload:msg})}catch(e){}}}
+function hostHeat(inv,rep){
+  const id=inv.id,jer=Math.random()<.5?["red","blue"]:["blue","red"];
+  const brk=SQ.BREAKS[inv.brk]?inv.brk:SQ.breakId,cond=SQ.heat.conditionsFor(brk)||SQ.heat.conditions();
+  const meKit=Object.assign(myKit(),{jersey:jer[0]},SQ.heat.kit(jer[0])),opp=Object.assign({},rep.kit||{name:inv.toName,country:"au"},{jersey:jer[1]});
+  let started=false,oppKit=null;
+  const ch=heatChannel(id,m=>{
+    if(m.t==="hello"){oppKit=Object.assign(opp,m.kit,{jersey:jer[1]});
+      send({t:"start",cfg:{id,host:false,brk,P:cond,me:oppKit,opp:meKit},ht:started?Math.round(performance.now()-LOBBY.heat.t0):0});
+      if(!started){started=true;LOBBY.heat={id,t0:performance.now()};enterHeat({id,host:true,brk,P:cond,me:meKit,opp:oppKit},send)}
+      return}
+    if(started)SQ.heat.onMsg(m)});
+  const send=heatSendFn(ch);LOBBY.heatCh=ch;ch.subscribe();
+  toast(`${inv.toName} accepted. Setting up the heat…`);
+  setTimeout(()=>{if(!started){toast(`Couldn't connect to ${inv.toName}. Try again.`);leaveHeatCh()}},20000);
+}
+function joinHeat(p){
+  let started=false;
+  const ch=heatChannel(p.id,m=>{
+    if(m.t==="start"){if(started)return;started=true;clearInterval(hello);closeInvite();
+      const cfg=Object.assign({},m.cfg,{t:(m.ht||0)+80});cfg.me=Object.assign({},cfg.me,SQ.heat.kit(cfg.me.jersey));
+      enterHeat(cfg,send);return}
+    if(started)SQ.heat.onMsg(m)});
+  const send=heatSendFn(ch);LOBBY.heatCh=ch;
+  let tries=0;const hello=setInterval(()=>{if(started||++tries>20){clearInterval(hello);if(!started){closeInvite();toast("Couldn't connect to the heat.");leaveHeatCh()}return}
+    send({t:"hello",kit:Object.assign(myKit(),SQ.heat.kit("blue"))})},1000);
+  ch.subscribe();
+}
+function enterHeat(cfg,send){
+  LOBBY.busy=true;lobbyUpdate();
+  // the opponent's look was made for whichever jersey they had before the colours were drawn: recolour it
+  const recolour=k=>{if(k.look){k.look=Object.assign({},k.look,{top:{red:"#d8262c",blue:"#1f5fd6",yellow:"#f2c018",white:"#f4f4f2"}[k.jersey],trim:k.jersey==="white"?"#1d2b3a":"#ffffff",topBrand:""})}};
+  recolour(cfg.opp);
+  location.hash="#play";
+  setTimeout(()=>{SQ.heat.start(cfg,send)},60);
+}
+function leaveHeatCh(){if(LOBBY.heatCh){try{NET.client.removeChannel(LOBBY.heatCh)}catch(e){}LOBBY.heatCh=null}LOBBY.busy=false;LOBBY.heat=null;lobbyUpdate()}
+const HEAT_PRIZE=150,HEAT_DRAW=50,HEAT_MIN_MS=120000;
+SQ.onHeatEnd=r=>{
+  LOBBY.busy=false;
+  const quit=r.why==="forfeit"||r.why==="lost";
+  if(quit&&r.t<HEAT_MIN_MS){lobbyUpdate();return {note:"The heat ended in the first two minutes, so it doesn't count toward your record."}}
+  const h=heatRec(),C=SQ.career,opR=(r.opp_&&r.opp_.rating)||1000;
+  const S=r.res==="win"?1:r.res==="loss"?0:.5,exp=1/(1+Math.pow(10,(opR-h.rating)/400)),delta=Math.round(32*(S-exp));
+  h.rating=Math.max(100,h.rating+delta);if(S===1)h.w++;else if(S===0)h.l++;else h.d++;
+  const prize=S===1?HEAT_PRIZE:S===.5?HEAT_DRAW:0;C.money+=prize;SQ.saveCareer();SQ.renderCareer();save();purse();
+  if(NET.client&&NET.user){
+    const meWin=S===1,winner=S===.5?"draw":(meWin===!!r.host?"host":"guest");
+    const me={id:NET.user.id,name:NET.name,score:+r.me.toFixed(2)},op={id:r.opp_&&r.opp_.id||null,name:r.opp_?r.opp_.name:"?",score:+r.opp.toFixed(2)};
+    const H=r.host?me:op,G=r.host?op:me;
+    NET.client.from("heats").upsert({id:r.id,host:H.id,guest:G.id,host_name:H.name,guest_name:G.name,host_score:H.score,guest_score:G.score,winner,spot:SQ.BREAKS[r.brk]?SQ.BREAKS[r.brk].name:r.brk,forfeit:quit},{onConflict:"id",ignoreDuplicates:true})
+      .then(x=>{if(x.error)console.warn("Heat not recorded:",x.error.message)});
+    netPush(true);
+  }
+  lobbyUpdate();
+  return {note:`${prize?`<b>+$${prize}</b> prize money · `:""}Heat rating ${Math.round(h.rating)} (${delta>=0?"+":""}${delta}) · Record ${h.w}–${h.l}${h.d?`–${h.d}`:""}`};
+};
+/* head-to-head: every heat you've surfed, grouped by opponent */
+async function netHeatHistory(){
+  if(!NET.client||!NET.user)return null;
+  const {data,error}=await NET.client.from("heats").select("host,guest,host_name,guest_name,host_score,guest_score,winner,spot,created_at").or(`host.eq.${NET.user.id},guest.eq.${NET.user.id}`).order("created_at",{ascending:false}).limit(200);
+  if(error)return {err:missingCol(error)||/relation|does not exist|heats/i.test(error.message)?"Head-to-head records need the new database setup. Paste the updated SQL into Supabase to switch them on.":error.message};
+  const by={},recent=[];
+  data.forEach(x=>{const mine=x.host===NET.user.id,opp=mine?x.guest_name:x.host_name,my=mine?x.host_score:x.guest_score,their=mine?x.guest_score:x.host_score;
+    const res=x.winner==="draw"?"D":(x.winner==="host")===mine?"W":"L";
+    const o=by[opp]||(by[opp]={n:opp,w:0,l:0,d:0});o[res==="W"?"w":res==="L"?"l":"d"]++;
+    if(recent.length<6)recent.push({opp,res,my:+my,their:+their,spot:x.spot,at:x.created_at})});
+  return {by:Object.values(by).sort((a,b)=>(b.w+b.l+b.d)-(a.w+a.l+a.d)),recent};
+}
+async function fillHeatHistory(){const box=$("#h2h");if(!box)return;const r=await netHeatHistory();if(!r||!$("#h2h"))return;
+  if(r.err){box.innerHTML=`<p class="hint">${esc(r.err)}</p>`;return}
+  if(!r.by.length){box.innerHTML='<p class="hint">No heats yet. Invite a mate to start your record.</p>';return}
+  box.innerHTML=`<ul class="h2h">${r.by.map(o=>`<li><b>${esc(o.n)}</b><span class="rec"><i class="w">${o.w} W</i><i class="l">${o.l} L</i>${o.d?`<i>${o.d} D</i>`:""}</span></li>`).join("")}</ul>
+    <span class="label" style="margin-top:6px">Recent heats</span><ul class="hrecent">${r.recent.map(x=>`<li><span class="res ${x.res}">${x.res}</span><span>vs <b>${esc(x.opp)}</b> · ${esc(x.spot||"")}</span><span class="num">${x.my.toFixed(2)} – ${x.their.toFixed(2)}</span></li>`).join("")}</ul>`}
+
+/* ---------- the Heats page ---------- */
+function heatsView(){
+  const head=`<a class="back" href="#home">← Home</a><div><span class="label">Online · live</span><h1 style="font-size:clamp(30px,5vw,48px);font-weight:900;font-stretch:118%;margin-top:4px">1 v 1 Heats</h1></div>`;
+  const rules=`<section class="panel hrules"><h2>How a heat works</h2><ul>
+    <li><b>10 minutes</b>, same break, same waves for both of you. Your best <b>two</b> wave scores are added for your total.</li>
+    <li><b>Priority.</b> Whoever rode a wave most recently loses priority. If you both paddle for the same wave, the surfer with priority gets it and the other has to pull back.</li>
+    <li>You get a <b>red or blue rashie</b> when the heat starts, so you can spot each other in the water.</li>
+    <li>The inviter picks the break. Both of you get that day's conditions there, and nobody pays tickets.</li>
+    <li><b>Win a heat: +$${HEAT_PRIZE}</b> prize money and your heat rating goes up. A draw pays $${HEAT_DRAW}. Beating a higher-rated surfer moves your rating more.</li></ul></section>`;
+  const country=`<label class="shsl hcountry">Your country ${flagTag(myCountry())}<select id="hCountry">${COUNTRIES.map(([c,n])=>`<option value="${c}" ${c===myCountry()?"selected":""}>${esc(n)}</option>`).join("")}</select></label>`;
+  if(!onlineOn()||!NET.ready)return `<main class="wrap hwrap">${head}<section class="panel"><p>${NET.err?esc(NET.err):"Connecting to the online service…"}</p></section>${rules}</main>`;
+  if(!NET.user)return `<main class="wrap hwrap">${head}<section class="panel" style="display:grid;gap:12px"><h2>Sign in to play heats</h2><p>Heats are live against other signed-in players. Make a free account with a surfer name and password.</p><div><a class="btn primary" href="#account">Sign in</a></div></section>${rules}</main>`;
+  const list=LOBBY.online.length?LOBBY.online.map(o=>`<li><span class="who">${flagTag(o.country,26)}<span><b>${esc(o.name)}</b><small>Level ${o.level||1} · rating ${o.rating||1000}${o.w||o.l?` · ${o.w||0}–${o.l||0}`:""}${o.busy?" · in a heat":""}</small></span></span>
+      <button class="btn small ${o.busy?"ghost":"primary"}" data-invite="${esc(o.id)}" ${o.busy||LOBBY.pending?"disabled":""}>${o.busy?"Busy":"Invite"}</button></li>`).join("")
+    :`<li class="empty"><span class="who"><span><b>Nobody else is online right now</b><small>Send your mates the link. They'll appear here as soon as they sign in.</small></span></span></li>`;
+  if(!LOBBY.brk)LOBBY.brk=SQ.breakId;
+  const h=heatRec();
+  const brkSel=`<label class="shsl hcountry">Heat break<select id="hBreak">${Object.entries(SQ.BREAKS).map(([k,b])=>{const t=SQ.conditions(k);return `<option value="${k}" ${k===LOBBY.brk?"selected":""}>${esc(b.name)} · ${Math.max(4,Math.round(t.r.H*3.28))} ft · ${SQ.CATS[t.r.cat]}</option>`}).join("")}</select></label>`;
+  const rec=`<section class="panel" style="display:grid;gap:12px"><div class="panel-head"><h2>Your heat record</h2><span class="label">Rating ${Math.round(h.rating)}</span></div>
+    <div class="kv" style="grid-template-columns:repeat(3,minmax(0,1fr))"><div><span class="label">Won</span><b>${h.w}</b></div><div><span class="label">Lost</span><b>${h.l}</b></div><div><span class="label">Drawn</span><b>${h.d}</b></div></div>
+    <span class="label">Head to head</span><div id="h2h"><p class="hint">Loading…</p></div></section>`;
+  setTimeout(fillHeatHistory,0);
+  return `<main class="wrap hwrap">${head}
+    <div class="hgrid"><div class="stack"><section class="panel"><div class="panel-head"><h2>Online now</h2><span class="label">${LOBBY.online.length} surfer${LOBBY.online.length===1?"":"s"}</span></div>
+      <ul class="hlist">${list}</ul>
+      ${brkSel}<p class="hint">Your invites are for a heat at the break above. You're signed in as ${esc(NET.name)}.</p></section>${rec}</div>
+    <div class="stack">${`<section class="panel" style="display:grid;gap:10px"><h2>Your heat jersey</h2>${country}<p class="hint">Your flag shows next to your name on the heat scoreboard.</p></section>`}${rules}</div></div></main>`;
+}
+function renderHeats(){if(location.hash!=="#heats")return;const a=$("#app");if(a){a.innerHTML=heatsView();purse()}}
+document.addEventListener("change",e=>{if(e.target.id==="hBreak"){LOBBY.brk=e.target.value;return}if(e.target.id==="hCountry"&&state){state.player.country=e.target.value;save();lobbyUpdate();renderHeats();toast(`Country set to ${countryName(e.target.value)}`)}});
+
+const _onRide=SQ.onRide;SQ.onRide=r=>{_onRide(r);Promise.all([netScore(r),netPush(true)]).then(netRefreshBoard).catch(()=>{})};
 /* ---------- 3D: shop pictures and the live avatar are rendered by the game's own models ---------- */
 function hook3D(root){
   const bl=root.querySelector(".board-list");if(bl&&!bl.dataset.net&&typeof NET!=="undefined"&&NET.client){bl.dataset.net=1;netFillBoard()}
