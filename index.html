@@ -2133,8 +2133,11 @@ function stepAir(R,dt){
   if(u){A.yaw+=u*4.3*(.8+.04*b.r.air)*(input.hard?.8:1)*dt;if(!A.spinDir)A.spinDir=u}
   if(input.hard)A.grab+=dt;
   // backflip: tap ↓ early in a big air and the rider flips backwards over the board's long axis
-  if(input.stall&&!A.flip&&A.t<Math.min(.3,A.T*.3)&&!A.yaw){A.flip={a:0};trickCall("Backflip","Going over")}
-  if(A.flip&&!A.flipDone){A.flip.a+=3.8*(.85+.03*b.r.air)*dt;if(A.flip.a>=Math.PI*2){A.flip.a=Math.PI*2;A.flipDone=true}}
+  if(input.stall&&!A.flip&&!A.noFlip&&Math.abs(A.yaw)<.35){
+    if(A.T<1.15){A.noFlip=true;popText("Not enough height","Backflips need a big air: more speed into a steeper lip")}
+    else if(A.t>A.T*.55){A.noFlip=true;popText("Too late","Press ↓ in the first half of the air")}
+    else{A.flip={a:0,rate:Math.max(4.2,Math.PI*2/Math.max(.5,(A.T-A.t)*.82))*(.92+.01*b.r.air)};trickCall("Backflip","Going over")}}
+  if(A.flip&&!A.flipDone){A.flip.a+=A.flip.rate*dt;if(A.flip.a>=Math.PI*2){A.flip.a=Math.PI*2;A.flipDone=true}}
   R.x+=A.vx*dt;R.dist+=Math.abs(A.vx)*dt;
   let S=sample(W,R.x,R.z);const k=Math.min(1,A.t/A.T),ff=A.ff0+(A.ffL-A.ff0)*k;
   R.z=S.zTop+ff*Math.max(.6,S.zBot-S.zTop);S=sample(W,R.x,R.z);
@@ -2155,8 +2158,9 @@ function landAir(R,S){
   const hMax=(3.6+.35*P.H)*.85;if(A.h>hMax&&Math.random()<(A.h/hMax-1)*.5*(1.15-.05*b.r.control)){wipeout("Too much height","You came down too hard from a huge air and the board slid out. Bigger airs need cleaner landings.");return}
   if(S.b>.55&&Math.random()<(S.b-.4)*(1.2-.06*b.r.control)){wipeout("Landed in the whitewater","The foam swallowed the landing. Aim your airs at the open face ahead of the curl.");return}
   R.psi=landPsi();
-  const n=Math.round(deg/180),rightHander=P.dir<0,withWave=A.spinDir===(rightHander?1:-1),rev2=n>=1&&A.spinDir!==0&&!withWave;
-  let name=n===0?"Air":n===1?(rev2?"Air reverse":"Air"):n===2?(rev2?"Alley-oop 360":"360 air"):n===3?(rev2?"Alley-oop 540":"540 air"):"720 air";
+  // right-hander: spinning right is an alley-oop, spinning left is an air reverse. Left-hander: the other way round
+  const n=Math.round(deg/180),rightHander=P.dir<0,oop=n>=1&&A.spinDir!==0&&A.spinDir===(rightHander?1:-1);
+  let name=n===0?"Air":n===1?(oop?"Alley-oop":"Air reverse"):n===2?(oop?"Alley-oop 360":"360 air"):n===3?(oop?"Alley-oop 540":"540 air"):"720 air";
   if(A.flipDone)name="Backflip";
   const grab=A.grab>.25;
   R.moves.push({name,t:R.t,s:A.s0,d:A.d,hard:false,air:true,rot:deg,grab,h:A.h});
@@ -2191,7 +2195,9 @@ function stepRide(dt,raw){
   const u=(input.right?1:0)-(input.left?1:0),hard=input.hard&&u!==0;
   const sf=Math.max(.55,Math.min(1.15,R.s/8));
   const rh=input.rh&&u===input.rh&&R.s>5;if(rh&&R.turn&&R.turn.dir===u)R.turn.rh=true;
-  const rate=(rh?(hard?3.4:2.3):hard?4.7:2.9)*sf*(R.wobble>0?.45:1)*R.gs.turn*(hard?R.gs.gripTurn:1)*(R.walk>.25||R.head?.15:1);
+  // the roundhouse opens long and smooth, tightens as it comes round, then settles once you're facing back at the curl
+  const rhA=rh&&R.turn?R.turn.acc:0,rhK=Math.min(1,rhA/2.1);
+  const rate=(rh?((hard?2.7:2.2)+2.3*rhK)*(rhA>3.3?.35:1):hard?4.7:2.9)*sf*(R.wobble>0?.45:1)*R.gs.turn*(hard?R.gs.gripTurn:1)*(R.walk>.25||R.head?.15:1);
   R.psi+=u*rate*dt;
   R.wobble=Math.max(0,R.wobble-dt*R.gs.steady);
   if(R.gs.over>0&&R.wobble<=0&&Math.random()<dt*R.gs.over*.5)R.wobble=.35;   // too much wave for this board
@@ -2243,7 +2249,8 @@ function stepRide(dt,raw){
   if(R.inBarrel&&input.stall&&R.s>3){for(let k=0;k<4;k++)sprayEmit(R.x-Math.cos(R.psi)*.3,R.y+.35,R.z-.45,-Math.cos(R.psi)*R.s*.3+(Math.random()-.5),1+Math.random()*1.5,-1-Math.random(),.35+Math.random()*.3,.08+Math.random()*.1)}
   // body
   R.y=S.y+waterChop(R.x,R.z,simT)*(1-Math.min(1,(R.lastS?R.lastS.c:0)));
-  const tgtRoll=u*(hard?.72:.44)*Math.min(1,R.s/7)+(R.inBarrel?-P.dir*.42*Math.min(1,R.s/6):0);   // in the tube: up on the inside rail, locked into the faceR.roll+=(tgtRoll-R.roll)*Math.min(1,dt*11);
+  const tgtRoll=u*(hard?.72:.44)*Math.min(1,R.s/7)+(R.inBarrel?-P.dir*.42*Math.min(1,R.s/6):0);   /* in the tube: up on the inside rail, locked into the face */
+  R.roll+=(tgtRoll-R.roll)*Math.min(1,dt*11);
   R.crouchKick=Math.max(0,(R.crouchKick||0)-dt);
   const tgtCrouch=Math.min(1,(R.inBarrel?.95:.35)+Math.abs(u)*(hard?.45:.2)+(input.stall?.15:0)+R.crouchKick);R.crouch+=(tgtCrouch-R.crouch)*Math.min(1,dt*6);
   R.lastS=S;
@@ -2275,8 +2282,7 @@ function stepRide(dt,raw){
     if(R.inBarrel&&R.ff<-.18){wipeout("Hit by the lip","You rose into the lip inside the barrel. Stay low and let the tube cover you.");return}
     // ride straight up past the crest and you go over the back. Turning hard there lets the tail and fins swing out over the lip
     if(fzn<-.2&&R.ff<lim&&!(turning&&S.c>=.4)){endRide("Kicked out","You rode over the top of the wave and went off the back. Turn before the lip to stay on it.",true);return}
-    if(S.c<.4){R.z=Math.max(R.z,S.zTop+lim*Math.max(.6,S.zBot-S.zTop));}
-    else{R.z=S.zTop+.02*Math.max(.6,S.zBot-S.zTop);
+    if(S.c>=.4){R.z=S.zTop+.02*Math.max(.6,S.zBot-S.zTop);
     if(fzn<0){R.psi=Math.atan2(-fzn*.7,fxn);R.s*=.85;
       if(!R.lipT||R.t-R.lipT>.9){R.lipT=R.t;if(R.turn)R.turn=null;addMove("Off the lip","")}}}
   }
@@ -2309,7 +2315,7 @@ function finishTurn(){
   let name=null,extra="";
   if(T.slid&&deg<330){if(!R.maxTurn||deg>R.maxTurn.deg)R.maxTurn={deg,name:"Snap"};return}
   if(deg>=330){name="360 turn";extra=T.hard?"Full spin":""}
-  else if(T.rh&&T.back&&deg>140){name="Roundhouse cutback";extra="Long, drawn-out arc"}
+  else if(T.rh&&T.back&&deg>115){name="Roundhouse cutback";extra="Long arc back to the curl"}
   else if(T.back&&deg>70){name="Cutback";extra=T.hard?"Hard rail":""}
   else if(T.ff0>.5&&T.fz0>.15&&fz<-.05){name="Bottom turn";extra=T.hard?"Full rail":""}
   else if(T.ff0<.45&&T.fz0<-.05&&fz>.05){name=T.hard&&deg>95?"Hack":"Top turn";extra=T.hard?"Big spray":""}
@@ -2342,8 +2348,8 @@ function travel(id){
   return {ok:true,cost};
 }
 const CHALLENGES=[
-  {id:"score6",text:"Score 4.0 or better on one wave",t:1,test:i=>i.score>=4},
-  {id:"score8",text:"Score 5.5 or better on one wave",t:2,test:i=>i.score>=5.5},
+  {id:"score6",text:"Score 2.9 or better on one wave",t:1,test:i=>i.score>=2.9},
+  {id:"score8",text:"Score 3.9 or better on one wave",t:2,test:i=>i.score>=3.9},
   {id:"barrel15",text:"Get barrelled for 4 seconds",t:1,test:i=>i.maxBarrel>=4},
   {id:"barrel3",text:"Get a good barrel: 8 seconds",t:2,test:i=>i.maxBarrel>=8},
   {id:"barrel12",text:"Get an amazing barrel: 12 seconds and spat out",t:3,test:i=>i.maxBarrel>=12&&i.spat},
@@ -2358,7 +2364,7 @@ const CHALLENGES=[
   {id:"ride120",text:"Ride one wave for 2 minutes",t:2,test:i=>i.t>=120},
   {id:"waves5",text:"Surf 5 waves today",t:1,goal:5,count:"waves",test:(i,n)=>n.waves>=5},
   {id:"perfect3",text:"Nail 3 perfect take-offs today",t:1,goal:3,count:"perfect",test:(i,n)=>n.perfect>=3},
-  {id:"great5",text:"Score 3.5+ at a break rated Great or better",t:2,test:i=>i.score>=3.5&&i.cat>=4}
+  {id:"great5",text:"Score 2.5+ at a break rated Great or better",t:2,test:i=>i.score>=2.5&&i.cat>=4}
 ];
 const chDay=()=>Math.floor(Date.now()/86400e3);
 function dailyChallenges(){const d=chDay(),out=[];for(let k=0;out.length<3&&k<60;k++){const c=CHALLENGES[hash32("ch"+d+":"+k)%CHALLENGES.length];if(!out.includes(c))out.push(c)}return out}
@@ -2417,9 +2423,9 @@ function judgeRide(R,outcome){
     const best=vals.slice(0,8).reduce((s,v,i)=>s+v*[1,.9,.8,.7,.6,.45,.3,.2][i],0);
     const raw=best+variety*.2*J.w.variety*nf+flow*.8*J.w.flow*nf+commit*.8*J.w.commit*nf+(sel*.45+diff*.55)*nf+speedS*.35*J.w.speed*nf+completion;
     let sc=10*(1-Math.exp(-Math.max(0,raw)/9))/(1-Math.exp(-15/9))+(Math.random()-.5)*.4;if(cap<10&&sc>cap-1.2+.3)capped=true;sc=soft(sc);
-    sc=Math.max(.1,Math.min(10,sc))*.7;   // the old 10 is now a 7
-    // 7 to 10 is only for exceptional rides: far more than the old perfect ride, with 6+ difficult tricks
-    if(cap>=10){const room=majors<6?1:majors<7?2:3,extra=3*(1-Math.exp(-Math.max(0,raw-15)/12))/(1-Math.exp(-25/12));sc+=Math.min(room,extra)}
+    sc=Math.max(.1,Math.min(10,sc))*.5;   // the original 10 is now a 5
+    // 5 to 10 is only for exceptional rides: way beyond the old perfect ride, with lots of difficult tricks
+    if(cap>=10){const room=majors<4?1:majors<6?2:majors<7?3.5:5,extra=5*(1-Math.exp(-Math.max(0,raw-15)/14))/(1-Math.exp(-30/14));sc+=Math.min(room,extra)}
     sc=Math.round(Math.max(.1,Math.min(10,sc))*10)/10;
     return {...J,score:sc};
   });
@@ -2445,7 +2451,7 @@ function judgeRide(R,outcome){
   else if(outcome==="lost")why.push("The wave got away from you before the end.");
   return {score,judges,crit,why:why.filter(Boolean).join(" "),turns,barrels,airs,done};
 }
-function band(s){return s<1.5?"Poor":s<3?"Fair":s<4.5?"Average":s<6?"Good":s<8?"Excellent":"Outstanding"}
+function band(s){return s<1.1?"Poor":s<2.1?"Fair":s<3.2?"Average":s<4.3?"Good":s<5.7?"Excellent":"Outstanding"}
 function earnings(R,J,outcome){
   const rows=[];
   if(R.q===1)rows.push(["Perfect take-off",2]);
@@ -2457,7 +2463,7 @@ function earnings(R,J,outcome){
   {const by={};J.airs.forEach(x=>{(by[x.m.name]=by[x.m.name]||[]).push(x)});
     Object.entries(by).forEach(([nm,xs])=>rows.push([nm+(xs.length>1?" ×"+xs.length:""),Math.round((AIR_PAY[nm]||4)*(1+.5*Math.min(3,xs.length-1)))+xs.filter(x=>x.m.grab).length]))}
   if(R.t>8)rows.push([`Long ride ${Math.round(R.t)} s`,Math.min(13,Math.round((R.t-8)*.27))]);
-  if(J.score>0)rows.push([`Wave score ${J.score.toFixed(2)}`,Math.round(J.score*J.score*.2)]);
+  if(J.score>0)rows.push([`Wave score ${J.score.toFixed(2)}`,Math.round(Math.pow(J.score*1.4,2)*.2)]);
   if(outcome==="complete")rows.push(["Wave completion",5]);
   const sub=rows.reduce((s,r)=>s+(typeof r[1]==="number"?r[1]:0),0),m=BREAKS[breakId].mult;
   const total=Math.round(sub*m*2);   // doubled after playtesting
@@ -2466,13 +2472,13 @@ function earnings(R,J,outcome){
 function awardRide(R,J,E,outcome){
   const before=career.level;
   career.money+=E.total;career.waves++;career.best=Math.max(career.best,J.score);
-  const xp=Math.round((J.score*25+J.done.length*6+J.airs.length*8+J.barrels.reduce((s,x)=>s+x.m.len,0)*12+(outcome==="complete"?20:0))*Math.sqrt(BREAKS[breakId].mult));
+  const xp=Math.round((J.score*35+J.done.length*6+J.airs.length*8+J.barrels.reduce((s,x)=>s+x.m.len,0)*12+(outcome==="complete"?20:0))*Math.sqrt(BREAKS[breakId].mult));
   career.xp+=xp;const ups=[];
   while(career.level<50&&career.xp>=xpToNext(career.level)){career.xp-=xpToNext(career.level);career.level++;const r=rewardFor(career.level);career.money+=r.money;career.tickets+=r.tickets;if(r.grant)grantItem(r.grant);if(career.level===15)career.vouchers.shape++;if(career.level===25)career.vouchers.spray++;ups.push(r)}
   const info={score:J.score,maxBarrel:J.barrels.reduce((s,x)=>Math.max(s,x.m.len),0),spat:J.barrels.some(x=>x.m.spat),hard:J.turns.filter(x=>x.m.hard).length,
     cutbacks:J.turns.filter(x=>x.m.name==="Cutback").length,airs:J.airs.length,oops:J.airs.filter(x=>/Alley-oop/.test(x.m.name)).length,
     r360:J.airs.filter(x=>/360|540|720/.test(x.m.name)).length,floaters:J.turns.filter(x=>x.m.name==="Floater").length,t:R.t||0,perfect:R.q===1,cat:cond?cond.r.cat:0};
-  const got=checkChallenges(info),bonus=J.score>=5.5?1:0;career.tickets+=bonus;
+  const got=checkChallenges(info),bonus=J.score>=3.9?1:0;career.tickets+=bonus;
   saveCareer();renderCareer();
   const recs={turns:J.turns.length,barrel:+(R.barrelBest||0).toFixed(1),air:+Math.max(0,...J.airs.map(x=>x.m.h||0)).toFixed(1),airs:J.airs.length,wave:Math.round(P.H*3.28),speed:Math.round((R.top||0)*KMH),ride:+(R.t||0).toFixed(1)};
   if(window.SQ&&SQ.onRide)try{SQ.onRide({recs,score:J.score,loc:P.name,turns:J.turns.length,barrels:J.barrels.length,earned:E.total,
@@ -2654,7 +2660,8 @@ function updateCamera(raw){
   if(camSwitch>0&&camMode!=="first")k=Math.min(k,1-Math.exp(-raw*2.6));   // ease between camera angles
   camera.position.lerp(camPos,k);curLook.lerp(camLook,Math.min(1,k*1.3));
   if(ride&&!ride.wipe&&!ride.air&&(ride.camB||0)>.08&&(camMode==="behind"||camMode==="close"||camMode==="chase"))keepInTube(camera.position,ride);
-  if(ride&&(mode==="ride"||mode==="wipe")&&(camMode==="behind"||camMode==="close"||camMode==="chase"))camClear(camera.position,ride);
+  // only near the curl or in a wipeout, where the lip can come between you and the camera; elsewhere the camera swings freely
+  if(ride&&(mode==="wipe"||(mode==="ride"&&(ride.camB||0)>.05||ride.lastS&&ride.lastS.d<1.5*P.H&&ride.lastS.c>.3))&&(camMode==="behind"||camMode==="close"||camMode==="chase"))camClear(camera.position,ride);
   if(shake>0){shake=Math.max(0,shake-raw);const a=shake*.5;camera.position.x+=(Math.random()-.5)*a;camera.position.y+=(Math.random()-.5)*a}
   camera.lookAt(curLook);
   if(Math.abs(camera.fov-fovT)>.2){camera.fov+=(fovT-camera.fov)*Math.min(1,raw*4);camera.updateProjectionMatrix()}
@@ -2691,7 +2698,9 @@ function camClear(cp,R){
   for(let i=i0;i<i1;i++)for(let j=0;j<NU-1;j++){
     v(i,j,tA);v(i+1,j,tB);v(i,j+1,tC);if(ry.intersectTriangle(tA,tB,tC,false,tH)){const dd=tH.distanceTo(camEye);if(dd<best)best=dd}
     v(i+1,j+1,tA);if(ry.intersectTriangle(tB,tA,tC,false,tH)){const dd=tH.distanceTo(camEye);if(dd<best)best=dd}}
-  if(best<dist+.5)cp.copy(camEye).addScaledVector(camDir,Math.max(.7,best-.55));
+  // ease toward the safe distance (fast when the lip comes in, slow when it clears) so the camera never jumps
+  const want=best<dist+.5?Math.max(.7,best-.55):dist;R.camD=R.camD==null?want:R.camD+(want-R.camD)*(want<R.camD?.35:.08);
+  if(R.camD<dist-.01)cp.copy(camEye).addScaledVector(camDir,R.camD);
 }
 const camRay=new THREE.Raycaster(),camEye=new THREE.Vector3(),camDir=new THREE.Vector3(),tA=new THREE.Vector3(),tB=new THREE.Vector3(),tC=new THREE.Vector3(),tH=new THREE.Vector3();
 
@@ -2757,7 +2766,7 @@ document.addEventListener("click",e=>{
   const fb=e.target.closest("[data-fc]");if(fb){fcBreak=fb.dataset.fc;renderForecast();return}
   const gb=e.target.closest("[data-go-break]");if(gb){const r=travel(gb.dataset.goBreak);
     if(r.ok){document.getElementById("fc").hidden=true;popText(P.name,r.cost?`−${r.cost} ticket${r.cost>1?"s":""}`:"")}
-    else{const mm=document.getElementById("fcMsg");if(mm&&r.locked)mm.textContent=r.locked;else if(mm)mm.textContent=`You need ${r.need} tickets and have ${career.tickets}. Earn more from daily challenges, 5.5+ waves and level-ups.`}return}
+    else{const mm=document.getElementById("fcMsg");if(mm&&r.locked)mm.textContent=r.locked;else if(mm)mm.textContent=`You need ${r.need} tickets and have ${career.tickets}. Earn more from daily challenges, 3.9+ waves and level-ups.`}return}
   const bd=e.target.closest("[data-board]");if(bd&&!bd.disabled){if(mode==="lineup"||mode==="result")equipBoard(bd.dataset.board);else{career.board=bd.dataset.board;saveCareer()}renderBoards();return}
   const s=e.target.closest("[data-stance]");if(s){stance=s.dataset.stance;document.querySelectorAll("[data-stance]").forEach(x=>x.setAttribute("aria-pressed",x===s));return}
 });
@@ -3011,7 +3020,8 @@ function buildGhost(o){
   const g={rig:makeRider(),board:null,tag:nameSprite(o.name,JERSEY[o.jersey].c),has:false,j:null,rp:new THREE.Vector3(),rq:new THREE.Quaternion(),bp:new THREE.Vector3(),bq:new THREE.Quaternion(),pp:new THREE.Vector3(),last:0,lastPos:new THREE.Vector3(),spd:0};
   styleRider(g.rig,o.look);
   let spec=BOARDS[o.board];if(o.design)try{spec=customSpec(o.design,"opp_custom_"+o.id)}catch(e){}if(!spec)spec=BOARDS.starter;
-  g.board=makeBoard(spec,o.acc||{},{stock:true});   // never paint another surfer's board with your own sprayg.rig.root.visible=g.board.visible=g.tag.visible=false;
+  g.board=makeBoard(spec,o.acc||{},{stock:true});   /* never paint another surfer's board with your own spray */
+  g.rig.root.visible=g.board.visible=g.tag.visible=false;
   scene.add(g.rig.root);scene.add(g.board);scene.add(g.tag);
   g.joints=[g.rig.pelvis,g.rig.torso,g.rig.neck,g.rig.armL.piv,g.rig.armR.piv,g.rig.foreL.piv,g.rig.foreR.piv,g.rig.thighL.piv,g.rig.thighR.piv,g.rig.shinL.piv,g.rig.shinR.piv];
   return g}
@@ -3544,7 +3554,7 @@ body:not(.in-menu) #menu{display:none}
 .flag{border-radius:2px;object-fit:cover;box-shadow:0 0 0 1px rgba(255,255,255,.25);vertical-align:middle;flex:none}
 .ctry{display:flex;align-items:center;gap:10px}
 .ctry select,.hcountry select{flex:1;padding:10px 12px;border-radius:10px;border:1px solid var(--line-strong);background:var(--deep);color:var(--foam);font-size:15px}
-.hcountry{display:grid;gap:8px}
+.hcountry{display:grid;gap:8px;min-width:0}.hcountry select{width:100%;min-width:0;max-width:100%;text-overflow:ellipsis}.hsel.two{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}#inviteBox .hcountry select{font-size:14px}
 .hwrap{display:grid;gap:20px}
 .hgrid{display:grid;grid-template-columns:minmax(0,1.2fr) minmax(0,1fr);gap:20px;align-items:start}
 .hlist{list-style:none;margin:0;padding:0;display:grid;gap:8px}
@@ -3638,7 +3648,7 @@ function freshState(p){
     location:"Snapper Rocks",achievements:[],created:Date.now(),updated:Date.now()};
 }
 let state=load();
-SQ.syncLoc();
+SQ.syncLoc();lbReset();
 const curLoc=()=>SQ.BREAKS[SQ.breakId].name;
 function lookOf(p){const kit=KITS.find(k=>k.id===p.kit)||KITS[0];
   return {skin:(SKIN.find(s=>s[0]===p.skin)||SKIN[1])[1],hair:(HAIR_COLOURS.find(c=>c[0]===p.hairColour)||HAIR_COLOURS[0])[1],rash:kit.rash,trim:kit.trim,shorts:kit.shorts,board:p.boardColour,hairStyle:p.hair||"short",eyes:p.eyes||"round",brows:p.brows||"straight",facial:p.facial||"none",zinc:p.zinc||"none",bare:p.bare==="yes"?"yes":"no"}}
@@ -3740,16 +3750,16 @@ const CURRENT_SECTION=8;
 
 /* Example leaderboard rows: clearly labelled, replaced by real players in Section 9 */
 const EX_WAVES=[
-  {n:"reefdog_kai",loc:"Pipeline",s:9.43,t:"Backdoor barrel, closeout snap"},
-  {n:"lena.lefts",loc:"Cloudbreak",s:9.10,t:"Three carves, foam climb"},
-  {n:"jbay_jonno",loc:"Jeffreys Bay",s:8.87,t:"Speed line, two hooks, floater"},
-  {n:"mafua",loc:"Teahupo'o",s:8.60,t:"Late drop, deep barrel"},
-  {n:"saltyskipper",loc:"Bells Beach",s:7.95,t:"Bottom turn, roundhouse cutback"}
+  {n:"reefdog_kai",loc:"Pipeline",s:5.62,t:"Backdoor barrel, closeout snap"},
+  {n:"lena.lefts",loc:"Cloudbreak",s:5.31,t:"Three carves, foam climb"},
+  {n:"jbay_jonno",loc:"Jeffreys Bay",s:4.98,t:"Speed line, two hooks, floater"},
+  {n:"mafua",loc:"Teahupo'o",s:4.71,t:"Late drop, deep barrel"},
+  {n:"saltyskipper",loc:"Bells Beach",s:4.20,t:"Bottom turn, roundhouse cutback"}
 ];
 const EX_TODAY=[
-  {n:"jbay_jonno",loc:"Snapper Rocks",s:8.20,t:"Tube, two snaps"},
-  {n:"saltyskipper",loc:"Margaret River",s:7.65,t:"Hack, air attempt"},
-  {n:"tidewatcher",loc:"Trestles",s:7.10,t:"Air reverse"}
+  {n:"jbay_jonno",loc:"Snapper Rocks",s:4.35,t:"Tube, two snaps"},
+  {n:"saltyskipper",loc:"Margaret River",s:3.80,t:"Hack, air attempt"},
+  {n:"tidewatcher",loc:"Trestles",s:3.45,t:"Air reverse"}
 ];
 const EX_RICH=[
   {n:"reefdog_kai",money:6140,boards:14,level:41},
@@ -4263,7 +4273,7 @@ function challengesPanel(hid){
   return `<div class="panel-head"><h2 id="${hid}">Today's Challenges</h2><span class="label">Earn travel tickets</span></div>
     <ul class="chl">${list.map(c=>{const done=!!st.done[c.id],prog=c.goal?` (${Math.min(c.goal,st.n[c.count]||0)}/${c.goal})`:"";
       return `<li class="${done?"done":""}"><span class="tick">${done?"✓":""}</span><span>${esc(c.text)}${done?"":prog}</span><b>+${c.t} ticket${c.t>1?"s":""}</b></li>`}).join("")}</ul>
-    <p class="hint">New challenges every day. Waves scoring 5.5+ also earn a ticket, and level-ups pay tickets too.</p>`;
+    <p class="hint">New challenges every day. Waves scoring 3.9+ also earn a ticket, and level-ups pay tickets too.</p>`;
 }
 function mapView(){
   const B=SQ.BREAKS,here=SQ.breakId,ids=Object.keys(B);mapSel=mapSel&&B[mapSel]?mapSel:here;
@@ -4355,7 +4365,7 @@ document.addEventListener("click",e=>{
   const ms=e.target.closest("[data-mapsel]");if(ms){mapSel=ms.dataset.mapsel;$("#app").innerHTML=mapView();return}
   const tv=e.target.closest("[data-travel]");if(tv){const id=tv.dataset.travel,r=SQ.travel(id);
     if(r.ok){toast(r.here?"You're already here":`Welcome to ${SQ.BREAKS[id].name}`);purse();$("#app").innerHTML=mapView()}
-    else{const mm=$("#travelMsg");if(mm&&r.locked){mm.textContent=r.locked;mm.classList.add("err")}else if(mm){mm.textContent=`You need ${r.need} tickets and have ${SQ.career.tickets}. Earn more from today's challenges, 5.5+ waves and level-ups.`;mm.classList.add("err")}}return}
+    else{const mm=$("#travelMsg");if(mm&&r.locked){mm.textContent=r.locked;mm.classList.add("err")}else if(mm){mm.textContent=`You need ${r.need} tickets and have ${SQ.career.tickets}. Earn more from today's challenges, 3.9+ waves and level-ups.`;mm.classList.add("err")}}return}
   const tb=e.target.closest("[data-tail]");if(tb){const [bid,tl]=tb.dataset.tail.split("|");tailPick[bid]=tl;rerender();return}
   const bu=e.target.closest("[data-buy]");if(bu){const r=SQ.buy(bu.dataset.buy);toast(r.msg);rerender();const mm=$("#shopMsg");if(mm&&!r.ok){mm.textContent=r.msg;mm.classList.add("err")}return}
   const eqb=e.target.closest("[data-equip]");if(eqb){const r=SQ.equip(eqb.dataset.equip);toast(r.ok?r.msg.split(". ")[0]:r.msg);rerender();const mm=$("#shopMsg");if(mm&&r.msg.includes("fins"))mm.textContent=r.msg;return}
@@ -4877,7 +4887,9 @@ async function netPush(force){
   return {ok:true};
 }
 setInterval(()=>{if(NET.dirty)netPush(true)},20000);
-function applyBundle(d){if(!d||!d.s||!d.c)return false;state=d.s;Object.keys(SQ.career).forEach(k=>delete SQ.career[k]);Object.assign(SQ.career,d.c);SQ.fixCareer();
+/* scores were rescaled (old 7 = new 5), so best waves from before start again from zero, once */
+function lbReset(){const LB_SEASON=2;if(!state||(SQ.career.lbSeason||0)>=LB_SEASON)return;SQ.career.best=0;Object.assign(state.stats,{best:0,bestLoc:null,bestTricks:null});SQ.career.lbSeason=LB_SEASON;SQ.saveCareer();save()}
+function applyBundle(d){if(!d||!d.s||!d.c)return false;state=d.s;Object.keys(SQ.career).forEach(k=>delete SQ.career[k]);Object.assign(SQ.career,d.c);SQ.fixCareer();lbReset();
   SQ.saveCareer();save();syncSurfer();SQ.renderCareer();return true}
 async function netAfterLogin(){
   const {data}=await NET.client.from("saves").select("data,updated_at").eq("user_id",NET.user.id).maybeSingle();
@@ -5185,7 +5197,7 @@ function heatsView(){
   return `<main class="wrap hwrap">${head}
     <div class="hgrid"><div class="stack"><section class="panel"><div class="panel-head"><h2>Online now</h2><span class="label">${LOBBY.online.length} surfer${LOBBY.online.length===1?"":"s"}</span></div>
       <ul class="hlist">${list}</ul>
-      <div class="hsel">${brkSel}${lenSel}</div><div class="hsel">${stakeSel}${boardPick("hBoard")}</div>
+      <div class="hsel">${brkSel}${lenSel}</div><div class="hsel two">${stakeSel}${boardPick("hBoard")}</div>
       <div class="cta-row"><button class="btn primary" data-sendinv ${LOBBY.sel.length&&!LOBBY.pending?"":"disabled"}>${LOBBY.sel.length?`Invite ${LOBBY.sel.length} to a ${LOBBY.sel.length+1}-surfer heat`:"Add 1 to 3 mates above"}</button></div>
       <p class="hint">Heats are for 2 to 4 surfers. Your invites use the break, length and money above. Everyone puts the stake in when the heat starts. 1 v 1 the winner takes the pot; with 3 or 4 surfers 1st gets 75% and 2nd gets 25%. Ties split. You're signed in as ${esc(NET.name)}.</p></section>${rec}</div>
     <div class="stack">${`<section class="panel" style="display:grid;gap:10px"><h2>Your heat jersey</h2>${country}<p class="hint">Your flag shows next to your name on the heat scoreboard.</p></section>`}${rules}</div></div></main>`;
