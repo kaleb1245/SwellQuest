@@ -928,7 +928,7 @@ function buildParticles(){
   g.setAttribute("position",new THREE.BufferAttribute(pos,3));g.setAttribute("aAlpha",new THREE.BufferAttribute(al,1));g.setAttribute("aSize",new THREE.BufferAttribute(sz,1));g.setAttribute("aSeed",new THREE.BufferAttribute(Float32Array.from({length:N},()=>Math.random()),1));
   const m=new THREE.ShaderMaterial({transparent:true,depthWrite:false,uniforms:{uScale:{value:400},uTint:uniforms.uTint},
     vertexShader:`attribute float aAlpha;attribute float aSize;attribute float aSeed;uniform float uScale;varying float vA;varying float vSeed;
-      void main(){vec4 mv=modelViewMatrix*vec4(position,1.);vA=aAlpha;vSeed=aSeed;gl_PointSize=min(aSize*uScale/max(-mv.z,.5),uScale*.12);gl_Position=projectionMatrix*mv;}`,
+      void main(){vec4 mv=modelViewMatrix*vec4(position,1.);vA=aAlpha;vSeed=aSeed;gl_PointSize=min(aSize*uScale/max(-mv.z,.5),uScale*.1);gl_Position=projectionMatrix*mv;}`,
     fragmentShader:`uniform vec3 uTint;varying float vA;varying float vSeed;
       float h(vec2 p){return fract(sin(dot(p,vec2(127.1,311.7)))*43758.5453);}
       float drops(vec2 uv,float n,float s){vec2 g=uv*n+s*31.7;vec2 id=floor(g),f=fract(g)-.5;
@@ -1974,7 +1974,7 @@ function makePool(N){
   return {pts,N,pos,al,sz,vel:new Float32Array(N*3),life:new Float32Array(N),max:new Float32Array(N),next:0};
 }
 let spray=null;
-function buildSpray(){if(spray){scene.remove(spray.pts);spray.pts.geometry.dispose()}spray=makePool({low:700,medium:1800,high:3000,ultra:4000}[qualityId]||3000)}
+function buildSpray(){if(spray){scene.remove(spray.pts);spray.pts.geometry.dispose()}spray=makePool({low:600,medium:1400,high:2000,ultra:2600}[qualityId]||2000)}
 function sprayEmit(x,y,z,vx,vy,vz,life,size){const p=spray,i=p.next;p.next=(i+1)%p.N;
   p.pos[i*3]=x;p.pos[i*3+1]=y;p.pos[i*3+2]=z;p.vel[i*3]=vx;p.vel[i*3+1]=vy;p.vel[i*3+2]=vz;p.life[i]=p.max[i]=life;p.sz[i]=size}
 function sprayStep(dt){const p=spray;
@@ -2371,17 +2371,17 @@ function stepRide(dt,raw){
   // power slide: the tail swings out and the board skids sideways across the face
   if(R.slide){const Sl=R.slide;Sl.t+=dt;const hold=hard&&u===Sl.dir;
     Sl.yaw+=((hold?.95:0)-Sl.yaw)*Math.min(1,dt*(hold?6:9));R.s=Math.max(2,R.s-(2.2+.12*R.s)*dt);
-    const bx=R.x,bz=R.z;for(let k=0;k<Math.ceil(dt*600);k++){const fan=Math.random(),ox=-Math.sin(R.psi)*-Sl.dir,oz=Math.cos(R.psi)*-Sl.dir;
-      sprayEmit(bx-Math.cos(R.psi)*(.6-1.2*Math.random()),R.y+.05,bz-Math.sin(R.psi)*(.6-1.2*Math.random()),ox*R.s*(.9-.4*fan)+(Math.random()-.5),3+fan*R.s*.7,oz*R.s*(.9-.4*fan)+(Math.random()-.5),.7+Math.random()*.7,.18+Math.random()*.42)}
+    const bx=R.x,bz=R.z;for(let k=0;k<Math.ceil(dt*360);k++){const fan=Math.random(),ox=-Math.sin(R.psi)*-Sl.dir,oz=Math.cos(R.psi)*-Sl.dir;
+      sprayEmit(bx-Math.cos(R.psi)*(.6-1.2*Math.random()),R.y+.05,bz-Math.sin(R.psi)*(.6-1.2*Math.random()),ox*R.s*(.9-.4*fan)+(Math.random()-.5),3+fan*R.s*.7,oz*R.s*(.9-.4*fan)+(Math.random()-.5),.7+Math.random()*.7,(.18+Math.random()*.42)*1.13)}
     if(!hold||Sl.t>1.5||R.s<3.2){if(Sl.t>=.3&&!Sl.done){Sl.done=true;addMove("Snap",Sl.t.toFixed(1)+" s",{hard:true,slide:Sl.t})}if(Sl.yaw<.05||Sl.t>1.8)R.slide=null}}
   // spray off the rail
   if(u!==0&&R.s>4){
-    const n=Math.min(170,Math.round(Math.abs(u)*R.s*(hard?12:4.5)*dt*30+1));
+    const n=Math.min(100,Math.round(Math.abs(u)*R.s*(hard?12:4.5)*dt*30*.6+1));   // 40% fewer droplets than before, each a little bigger (same look, much less to draw)
     const bx=R.x-fx*.6,bz=R.z-fz*.6*ZK,out=-u;
     const ox=-fz*out,oz=fx*out;
     for(let k=0;k<n;k++){const sp=R.s*(hard?.8:.5)*(.6+Math.random()*.7);
       const fan=Math.random();   // a fan: low fast sheet out to the side up to a tall plume
-      sprayEmit(bx+ox*.25,R.y+.05,bz+oz*.25,ox*sp*(1.25-.6*fan)-fx*R.s*.25+(Math.random()-.5),(hard?4.2:2.6)+fan*R.s*(hard?.75:.45),oz*sp*(1.25-.6*fan)-fz*R.s*.12+(Math.random()-.5)*1.5,.7+Math.random()*.7,.14+Math.random()*(hard?.46:.26))}
+      sprayEmit(bx+ox*.25,R.y+.05,bz+oz*.25,ox*sp*(1.25-.6*fan)-fx*R.s*.25+(Math.random()-.5),(hard?4.2:2.6)+fan*R.s*(hard?.75:.45),oz*sp*(1.25-.6*fan)-fz*R.s*.12+(Math.random()-.5)*1.5,.7+Math.random()*.7,(.14+Math.random()*(hard?.46:.26))*1.13)}
   }
   if(R.inBarrel&&input.stall&&R.s>3){for(let k=0;k<4;k++)sprayEmit(R.x-Math.cos(R.psi)*.3,R.y+.35,R.z-.45,-Math.cos(R.psi)*R.s*.3+(Math.random()-.5),1+Math.random()*1.5,-1-Math.random(),.35+Math.random()*.3,.08+Math.random()*.1)}
   // body
