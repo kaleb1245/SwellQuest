@@ -478,6 +478,12 @@ vec3 skyCol(vec3 d){float y=max(d.y,0.);vec3 c=mix(uHorizon,uZenith,pow(y,.45));
  float cl=smoothstep(.55,.88,fbm(cp)*.75+fbm(cp*2.7+3.1)*.35)*smoothstep(.02,.2,y);
  c=mix(c,uCloud*(.86+.2*s),cl*.7);
  c+=vec3(1.,.85,.6)*pow(s,8.)*.35+vec3(1.)*pow(s,700.)*5.*(1.-cl);return c;}
+float fbm3(vec2 p){float v=0.,a=.5;for(int i=0;i<3;i++){v+=a*vnoise(p);p*=2.03;a*=.5;}return v*1.14;}
+vec3 skyLite(vec3 d,bool clouds){float y=max(d.y,0.);vec3 c=mix(uHorizon,uZenith,pow(y,.45));
+ float s=max(dot(d,normalize(uSun)),0.),cl=0.;
+ if(clouds){vec2 cp=d.xz/(y+.12)*1.1+vec2(uTime*.004,uTime*.002);
+  cl=smoothstep(.5,.9,fbm3(cp))*smoothstep(.02,.2,y);c=mix(c,uCloud*(.9+.12*s),cl*.55);}   // softer, simpler clouds
+ c+=vec3(1.,.85,.6)*pow(s,8.)*.14+vec3(1.,.97,.9)*pow(s,2600.)*1.3*(1.-cl);return c;}   // a smaller, gentler sun
 `;
 const WATER_FRAG=GLSL_COMMON+`
 uniform vec3 uDeep;uniform vec3 uMid;uniform vec3 uTurq;uniform float uFogNear;uniform float uFogFar;uniform vec3 uTint;uniform float uGlass;
@@ -498,9 +504,9 @@ void main(){
  float m0=vnoise(q2),mx=vnoise(q2+vec2(.1,0.)),mz=vnoise(q2+vec2(0.,.1));
  N=normalize(N+(vec3(n0-nx,0.,n0-nz)*(.35+.75*uGlass)+vec3(m0-mx,0.,m0-mz)*.55*uGlass)*lod);
  #ifdef OCEAN
- // a dense mosaic of tiny ripples on the flat water, so it sparkles and reflects in little cells
- vec2 q3=vWorld.xz*9.5+vec2(uTime*.9,-uTime*.7);float r0=vnoise(q3),rx=vnoise(q3+vec2(.08,0.)),rz=vnoise(q3+vec2(0.,.08));
- N=normalize(N+vec3(r0-rx,0.,r0-rz)*.6*uGlass*lod);
+ // a soft layer of small ripples on the open water (gentler and broader than before, so it doesn't glitter)
+ vec2 q3=vWorld.xz*5.5+vec2(uTime*.7,-uTime*.55);float r0=vnoise(q3),rx=vnoise(q3+vec2(.12,0.)),rz=vnoise(q3+vec2(0.,.12));
+ N=normalize(N+vec3(r0-rx,0.,r0-rz)*.42*uGlass*lod);
  #else
  // streaky lines running up the face as the wave draws water up it, plus fine ripples across them
  fl=vnoise(vec2(vWorld.x*3.6+vWorld.z*.6,vWorld.y*.45-uTime*.35));float flx=vnoise(vec2(vWorld.x*3.6+vWorld.z*.6+.09,vWorld.y*.45-uTime*.35));
@@ -537,7 +543,7 @@ void main(){
  float sp=max(dot(R,L),0.);
  col+=(pow(sp,220.)*2.25+pow(sp,30.)*.15)*vec3(1.,.95,.85)*vAo;                 // sharp sun glints plus a broad sheen
  col+=uTurq*pow(1.-ndv,3.)*.10*(1.-fres)*clamp(hr*1.5,0.,1.);                  // light glowing through the upper face
- #ifndef LOWQ
+ #if !defined(LOWQ) && !defined(OCEAN)
  if(lod>0.){float gl=lod*step(.93,vnoise(vWorld.xz*11.+vec2(uTime*1.7,-uTime*1.3)));               // sparkling sun glitter
  col+=gl*pow(sp,14.)*vec3(1.,.96,.88)*2.2*vAo;}
  #endif
@@ -551,7 +557,7 @@ void main(){
  #ifdef OCEAN
  // lacy foam left behind by broken waves, inside the break zone
  float inside=smoothstep(-58.,-34.,vWorld.z)*(1.-smoothstep(uBeachZ-14.,uBeachZ-6.,vWorld.z));
- if(inside>.001)lace=inside*smoothstep(.6,.78,fbm(vWorld.xz*.16+vec2(0.,uTime*.03)))*smoothstep(.45,.7,fbm(vWorld.xz*1.1+7.3))*.55;
+ if(inside>.001)lace=inside*smoothstep(.6,.78,fbm3(vWorld.xz*.16+vec2(0.,uTime*.03)))*smoothstep(.45,.7,vnoise(vWorld.xz*1.1+7.3))*.55;
  #endif
  float fk=clamp(foam+streak+lace,0.,1.);
  if(fk>0.){float bub=vnoise(vWorld.xz*7.+vec2(vWorld.y*5.,uTime*.8));
@@ -593,14 +599,14 @@ let waveMat=makeWaterMat(WAVE_VERT), oceanMat=makeWaterMat(OCEAN_VERT);
 /* sky dome */
 const sky=new THREE.Mesh(new THREE.SphereGeometry(1500,32,16),new THREE.ShaderMaterial({uniforms,side:THREE.BackSide,depthWrite:false,
   vertexShader:`varying vec3 vW;void main(){vW=(modelMatrix*vec4(position,1.)).xyz;gl_Position=projectionMatrix*viewMatrix*vec4(vW,1.);}`,
-  fragmentShader:GLSL_COMMON+`varying vec3 vW;void main(){vec3 d=normalize(vW-cameraPosition);gl_FragColor=vec4(skyCol(d),1.);}`}));
+  fragmentShader:GLSL_COMMON+`varying vec3 vW;void main(){vec3 d=normalize(vW-cameraPosition);gl_FragColor=vec4(skyLite(d,true),1.);}`}));
 scene.add(sky);
 
 /* ocean plane */
-let ocean=null;
+let ocean=null;const oceanNX=()=>Math.round(Q.seg*1.6);
 function buildOcean(){
   if(ocean){scene.remove(ocean);ocean.geometry.dispose()}
-  const g=new THREE.PlaneGeometry(3200,700,Q.seg*3,Q.seg);g.rotateX(-Math.PI/2);   // follows the camera along the coast
+  const g=new THREE.PlaneGeometry(3200,700,oceanNX(),Math.round(Q.seg*.55));g.rotateX(-Math.PI/2);   // follows the camera along the coast (its ripples are small and gentle, so a lighter mesh does)
   ocean=new THREE.Mesh(g,oceanMat);ocean.position.set(0,0,-310+P.beachZ+40);ocean.frustumCulled=false;scene.add(ocean);
 }
 
@@ -3382,7 +3388,7 @@ function watchSpeed(){if(qualityPicked||qualityId==="low"||mode==="replay")retur
 function tick(raw){
   watchSpeed(raw);
   todStep(raw);
-  if(mode==="replay"&&RP){stepParticles(0);sprayStep(raw*(RP.pause?0:RP.speed));replayTick(raw);sky.position.copy(camera.position);if(ocean){const seg=3200/(Q.seg*3);ocean.position.x=Math.round(camera.position.x/seg)*seg}return}
+  if(mode==="replay"&&RP){stepParticles(0);sprayStep(raw*(RP.pause?0:RP.speed));replayTick(raw);sky.position.copy(camera.position);if(ocean){const seg=3200/oceanNX();ocean.position.x=Math.round(camera.position.x/seg)*seg}return}
   const dt=paused?0:raw*timeScale;simT+=dt;uniforms.uTime.value=simT;
   stepWaves(dt,simT);if(HEAT)heatTick(raw);stepParticles(dt);sprayStep(dt);stepJet(raw,simT);
   stormTick-=raw;if(stormTick<=0){stormTick=1;if(career.stormUntil){renderTag();if(Date.now()>=career.stormUntil){career.stormUntil=0;saveCareer();applyConditions();popText("Perfect Storm over","")}}}
@@ -3402,7 +3408,7 @@ function tick(raw){
   recFrame(raw);
   updateCamera(raw);
   sky.position.copy(camera.position);
-  if(ocean){const seg=3200/(Q.seg*3);ocean.position.x=Math.round(camera.position.x/seg)*seg}
+  if(ocean){const seg=3200/oceanNX();ocean.position.x=Math.round(camera.position.x/seg)*seg}
 }
 
 
@@ -3942,7 +3948,7 @@ window.SQ={
   onRide:null
 };
 requestAnimationFrame(frame);
-window.__sq={judge(R,o,sig){const k=career.sig;career.sig=sig||null;try{return judgeRide(R,o)}finally{career.sig=k}},kick(){endRide("Kicked out","You kicked out over the back of the wave.",true)},shot(q){return renderer.domElement.toDataURL("image/jpeg",q||.92)},mkBoard(id,acc){const b=BOARDS[id];return makeBoard(b,Object.assign(boardAcc(b),acc||{}),{stock:true,noSponsor:true})},feet(){const spec=BOARDS[curBoard];surfer.updateMatrixWorld(true);return [rig.shinL,rig.shinR].map(sh=>{const p=surfer.worldToLocal(sh.end.getWorldPosition(new THREE.Vector3()));const u=Math.max(-1,Math.min(1,p.x/(.925*spec.sx)));return [p.x,p.z,p.y-.03-spec.sy*deckTop(u,spec)]})},trick(t,s){trickCall(t,s)},starGive(id,k){return starGive(id,k)},get perfInfo(){return {perf,qualityPicked,qualityId,pr:renderer.getPixelRatio(),mode}},hw(){return waves.map(w=>({hid:w.hid,z:w.z,peel:!!w.peeling,took:w.oppTook||null,peelX:w.peelX,at:w.at,seed:w.seed}))},surfY(x,z,id){const W=waves.find(w=>w.hid===id);return W?sample(W,x,z).y:NaN},get camera(){return camera},setFlipSign(s){FLIPS=s},get rigRef(){return rig},get surferRef(){return surfer},probe(){const R=ride;if(!R)return {mode};const S=sample(R.W,R.x,R.z);return {d:+(S.d/P.H).toFixed(2),c:+S.c.toFixed(2),ff:+R.ff.toFixed(2),inB:R.inBarrel,H:+P.H.toFixed(1),s:+R.s.toFixed(1),y:+R.y.toFixed(1),mode,air:!!R.air}},grant(id){career.boards[id]={owned:true};saveCareer();equipBoard(id)},get P(){return P},get career(){return career},get dir(){return P.dir},get H(){return P.H},step(n){for(let i=0;i<n;i++)tick(1/30);renderer.render(scene,camera)},get t(){return simT},get wz(){return target&&target.W.z},get mode(){return mode},get REC(){return REC},get RP(){return RP},get sessionBest(){return sessionBest},replayKey(c){return replayKey({code:c,preventDefault(){}})},get ride(){return ride},input,pickAlong(a){const W=incomingWave();if(!W)return false;target={W,x:PEEL_START()+P.dir*a,along:a,stage:0,dzR:99};W.hot=true;W.boost=true;mode="paddle";return true},ringTapPerfect(){ringT=ringZone*1.8/360;ringTap()},setBreak,claim(a){const W=incomingWave();if(!W)return false;this.pickAlong(a);if(HEAT){HEAT.myClaimAt=heatNow();W.clock=false;heatSend({t:"claim",id:W.hid,at:Math.round(HEAT.myClaimAt)})}return W.hid},get heat(){return HEAT},get waves(){return waves.map(W=>({id:W.hid,z:+W.z.toFixed(1),pk:W.peeling,px:+W.peelX.toFixed(1),rem:!!W.remote,clk:!!W.clock}))},get prompt(){return document.getElementById("prompt").textContent}};
+window.__sq={get scene(){return scene},judge(R,o,sig){const k=career.sig;career.sig=sig||null;try{return judgeRide(R,o)}finally{career.sig=k}},kick(){endRide("Kicked out","You kicked out over the back of the wave.",true)},shot(q){return renderer.domElement.toDataURL("image/jpeg",q||.92)},mkBoard(id,acc){const b=BOARDS[id];return makeBoard(b,Object.assign(boardAcc(b),acc||{}),{stock:true,noSponsor:true})},feet(){const spec=BOARDS[curBoard];surfer.updateMatrixWorld(true);return [rig.shinL,rig.shinR].map(sh=>{const p=surfer.worldToLocal(sh.end.getWorldPosition(new THREE.Vector3()));const u=Math.max(-1,Math.min(1,p.x/(.925*spec.sx)));return [p.x,p.z,p.y-.03-spec.sy*deckTop(u,spec)]})},trick(t,s){trickCall(t,s)},starGive(id,k){return starGive(id,k)},get perfInfo(){return {perf,qualityPicked,qualityId,pr:renderer.getPixelRatio(),mode}},hw(){return waves.map(w=>({hid:w.hid,z:w.z,peel:!!w.peeling,took:w.oppTook||null,peelX:w.peelX,at:w.at,seed:w.seed}))},surfY(x,z,id){const W=waves.find(w=>w.hid===id);return W?sample(W,x,z).y:NaN},get camera(){return camera},setFlipSign(s){FLIPS=s},get rigRef(){return rig},get surferRef(){return surfer},probe(){const R=ride;if(!R)return {mode};const S=sample(R.W,R.x,R.z);return {d:+(S.d/P.H).toFixed(2),c:+S.c.toFixed(2),ff:+R.ff.toFixed(2),inB:R.inBarrel,H:+P.H.toFixed(1),s:+R.s.toFixed(1),y:+R.y.toFixed(1),mode,air:!!R.air}},grant(id){career.boards[id]={owned:true};saveCareer();equipBoard(id)},get P(){return P},get career(){return career},get dir(){return P.dir},get H(){return P.H},step(n){for(let i=0;i<n;i++)tick(1/30);renderer.render(scene,camera)},get t(){return simT},get wz(){return target&&target.W.z},get mode(){return mode},get REC(){return REC},get RP(){return RP},get sessionBest(){return sessionBest},replayKey(c){return replayKey({code:c,preventDefault(){}})},get ride(){return ride},input,pickAlong(a){const W=incomingWave();if(!W)return false;target={W,x:PEEL_START()+P.dir*a,along:a,stage:0,dzR:99};W.hot=true;W.boost=true;mode="paddle";return true},ringTapPerfect(){ringT=ringZone*1.8/360;ringTap()},setBreak,claim(a){const W=incomingWave();if(!W)return false;this.pickAlong(a);if(HEAT){HEAT.myClaimAt=heatNow();W.clock=false;heatSend({t:"claim",id:W.hid,at:Math.round(HEAT.myClaimAt)})}return W.hid},get heat(){return HEAT},get waves(){return waves.map(W=>({id:W.hid,z:+W.z.toFixed(1),pk:W.peeling,px:+W.peelX.toFixed(1),rem:!!W.remote,clk:!!W.clock}))},get prompt(){return document.getElementById("prompt").textContent}};
 })();
 </script>
 
