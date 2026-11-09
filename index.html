@@ -2534,7 +2534,7 @@ const STORE_BASE=10,PROPS=[
 function boardCount(){return Object.keys(career.boards||{}).filter(id=>career.boards[id]&&career.boards[id].owned&&BOARDS[id]).length}
 function storeCap(){const o=career.props||{};return STORE_BASE+PROPS.filter(p=>o[p.id]).reduce((s,p)=>s+p.cap,0)}
 const storeFull=()=>boardCount()>=storeCap();
-const storeMsg=()=>`Your board storage is full (${boardCount()}/${storeCap()}). Buy a property on your Profile page, or sell a board.`;
+const storeMsg=()=>`Your board storage is full (${boardCount()}/${storeCap()}). Buy a property in the Board Room, or sell a board.`;
 function buyProp(id){const p=PROPS.find(x=>x.id===id);if(!p)return {ok:false,msg:"That property isn't for sale."};const o=career.props||(career.props={});
   if(o[id])return {ok:false,msg:"You already own it."};if(career.money<p.price)return {ok:false,msg:`You need $${p.price.toLocaleString("en-AU")}.`};
   career.money-=p.price;o[id]=Date.now();saveCareer();renderCareer();return {ok:true,msg:`${p.what} is yours. Room for ${p.cap} more boards.`}}
@@ -4141,6 +4141,8 @@ main{padding-block:28px 64px}
 .board-list{list-style:none;margin:0;padding:0;display:grid}
 .board-list li{display:grid;grid-template-columns:28px minmax(0,1fr) auto;gap:10px;align-items:center;padding:10px 4px;border-bottom:1px solid var(--line)}
 .board-list li:last-child{border-bottom:0}
+.rklist{list-style:none;margin:0;padding:0;display:grid}.rklist li{display:grid;grid-template-columns:30px minmax(0,1fr) auto;gap:10px;align-items:center;padding:9px 4px;border-bottom:1px solid var(--line)}.rklist li:last-child{border-bottom:0}.rklist li.you{background:rgba(255,196,126,.1);border-radius:8px}.rklist .rk{font-family:var(--f-display);font-weight:800;color:var(--muted);font-variant-numeric:tabular-nums}.rklist .who{min-width:0}.rklist .who b{font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.rklist .who .rksp{font-size:13px;color:var(--muted);overflow:hidden;white-space:nowrap}
+.rklist .who .rksp{display:flex;align-items:center;gap:6px;margin-top:2px}.rklist .rksp img{height:16px;max-width:54px;object-fit:contain;background:#fff;padding:2px 4px;border-radius:4px}.rklist .rksp.none{opacity:.6}.rklist .who b{display:flex;align-items:center;gap:6px}.rklist .val{text-align:right;font-weight:800}.rklist .val small{display:block;font-size:11px;font-weight:500;color:var(--muted)}.rkpanel .tabs{margin-bottom:6px}
 .board-list .rk{font-family:var(--f-display);font-weight:800;color:var(--muted);font-variant-numeric:tabular-nums}
 .board-list .who{min-width:0}
 .board-list .who b{display:block;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
@@ -4542,11 +4544,12 @@ const SECTIONS=[
   {id:"apparel",n:6,t:"Apparel Shop",s:"Boardshorts, wetsuits, hats",build:6},
   {id:"accessories",n:7,t:"Accessories",s:"Fins, leashes, tailpads",build:6},
   {id:"shaping",n:8,t:"Shaping Room",s:"Shape and spray your own board",build:8},
-  {id:"profile",n:9,t:"Player Profile",s:"Your surfer, quiver and stats",build:1},
+  {id:"profile",n:9,t:"Player Profile",s:"Your surfer, gear and stats",build:1},
   {id:"leaderboards",n:10,t:"Leaderboards",s:"Best waves and richest surfers",build:1},
   {id:"achievements",n:11,t:"Achievements",s:"Milestones and level rewards",build:1},
   {id:"hall",n:12,t:"Hall of Fame",s:"World Champions, Legends, famous shapers",build:1},
-  {id:"teams",n:13,t:"Surf Teams",s:"Five-surfer teams for Hall of Famers",build:1}
+  {id:"teams",n:13,t:"Surf Teams",s:"Five-surfer teams for Hall of Famers",build:1},
+  {id:"boardroom",n:14,t:"Board Room",s:"Your boards, storage and upgrades",build:1}
 ];
 const ROADMAP=[
   [1,"Foundation","Branding, homepage, player creation, saving, profile, level rewards"],
@@ -4626,7 +4629,8 @@ function homeA(){const b=homeBits();
       <div class="hA-left"><section class="panel hA-me"><div class="avatar-frame">${avCanvas}</div><div class="hA-me-txt"><span class="label">${b.stance} foot · ${esc(curLoc())}</span><h2>${esc(b.p.name)}</h2>${b.xp}<span class="hint num">${b.xpTxt}</span>
         <div class="hA-stats">${b.stats.map(([k,v])=>`<div><span class="label">${k}</span><b class="num">${v}</b></div>`).join("")}</div><a class="btn small ghost" href="#profile">My surfer</a></div></section>
       <section class="panel" aria-labelledby="ch-h">${challengesPanel("ch-h")}</section>
-      <section class="panel" aria-labelledby="ms-h">${missionsPanel("ms-h")}</section></div>
+      <section class="panel" aria-labelledby="ms-h">${missionsPanel("ms-h")}</section>
+      <section class="panel rkpanel" id="rkpanel" aria-labelledby="rk-h">${rankPanel("rk-h")}</section></div>
       <div class="stack"><section class="panel" aria-labelledby="lb-h">${leaderboardPanel("waves-all","lb-h")}</section>
       <section class="panel" aria-labelledby="rec-h">${recsPanel("rec-h")}</section></div>
     </div>
@@ -4745,17 +4749,7 @@ function profileView(){
       </aside>
       <div class="stack">
         <section class="panel">
-          <div class="panel-head"><h2>Quiver</h2><span class="label">${SQ.quiver().length} board${SQ.quiver().length>1?"s":""} · <a class="back" href="#boards" style="display:inline">Board shop</a></span></div>
-          <div class="quiver">${SQ.quiver().map(b=>`<div class="qb ${b.id===SQ.curBoard?"on":""}"><img class="thumb3d" data-thumb="myboard:${b.id}" alt="${esc(b.name)}">
-            <div class="panel-head"><h3>${esc(b.name)}</h3>${b.id===SQ.curBoard?'<span class="state live">Riding</span>':`<button class="btn small" data-equip="${b.id}">Ride this</button>`}</div>
-            <span class="hint">${SQ.boardDims(b)} · best in ${b.waves[0]}–${b.waves[1]} ft · ${b.fins} fins${b.custom?` · rated ${b.rating}/100`:""}</span>
-            <span class="hint qacc">${accLine(b.id)}</span>
-            <div class="cta-row"><button class="btn small ${custOpen===b.id?"primary":"ghost"}" data-cust="${b.id}">Customise</button>${b.soft?"":`<a class="back" href="#spray" data-spray-pick="${b.id}" style="display:inline">Spray this board</a>`}${b.id==="starter"?"":`<button class="btn small ghost" data-sell="${b.id}">${SQ.boardValue(b)?`Sell · ${money(SQ.boardValue(b))}`:"Give away"}</button>`}</div>
-            ${custOpen===b.id?custPanel(b.id):""}
-            <div class="rbars">${ratingBars(b)}</div></div>`).join("")}</div>
-        </section>
-        <section class="panel">
-          <div class="panel-head"><h2>Wearing & Gear</h2><span class="label"><a class="back" href="#apparel" style="display:inline">Apparel</a> · <a class="back" href="#accessories" style="display:inline">Accessories</a></span></div>
+          <div class="panel-head"><h2>Wearing & Gear</h2><span class="label"><a class="back" href="#boardroom" style="display:inline">Board Room</a> · <a class="back" href="#apparel" style="display:inline">Apparel</a> · <a class="back" href="#accessories" style="display:inline">Accessories</a></span></div>
           <div class="fair">${["shorts","top","suit","hat"].map(s=>{const id=SQ.career.gear.eq[s],gi=id&&SQ.GEAR_BY[id];
             return `<div><span class="label">${SQ.SLOT_NAMES[s]}</span><b style="font-size:14px">${gi?esc(gi.name):s==="fins"?"Stock fins":s==="leash"?"Starter leash":"None"}</b>${gi?`<button class="btn small ghost" data-unequip="${s}" style="margin-top:6px">Take off</button>`:""}</div>`}).join("")}</div>
           ${spareLine()}
@@ -4773,7 +4767,6 @@ function profileView(){
           </div>
         </section>
         ${ladderPanel()}
-        ${storagePanel()}
         ${teamMini()}
         ${typeof NET!=="undefined"&&NET.user?repPanel():""}
         ${sigPanel()}
@@ -4897,10 +4890,30 @@ function sponsorPanel(){SQ.sbBrief();const st=SQ.sponsorStatus(),h=st.have,n=st.
 document.addEventListener("click",e=>{const a=e.target.closest("[data-sp-sign]"),d=e.target.closest("[data-sp-drop]");if(!a&&!d)return;
   const r=a?SQ.signSponsor(a.dataset.spSign):SQ.dropSponsor();if(r.msg)toast(r.msg);if(r.ok){save();purse();netPush(true);rerender()}});
 /* ---------- board storage ---------- */
+/* ---------- the Board Room: every board you own, your storage and how to get more ---------- */
+function boardRoomView(){const n=SQ.boardCount(),cap=SQ.storeCap(),free=Math.max(0,cap-n),own=SQ.career.props||{},next=SQ.PROPS.find(p=>!own[p.id]);
+  return `<main class="wrap" style="display:grid;gap:20px">
+    <a class="back" href="#home">← Home</a>
+    <div class="panel-head"><div><span class="label">Your quiver and your racks</span><h1 style="font-size:clamp(30px,5vw,48px);font-weight:900;font-stretch:118%;margin-top:4px">Board Room</h1></div><span class="chip num"><b>${n}</b>/${cap} boards</span></div>
+    <section class="panel"><div class="kv" style="grid-template-columns:repeat(3,minmax(0,1fr))">
+      <div><span class="label">Boards</span><b>${n}</b></div><div><span class="label">Room for</span><b>${cap}</b></div><div><span class="label">Racks free</span><b>${free}</b></div></div>
+      <p class="hint">${free?`You can add ${free} more board${free>1?"s":""} before your racks are full.`:"<b>Your racks are full.</b> Buy a property below or sell a board before you buy or shape another."}${next?` Next upgrade: <b>${esc(next.n)}</b>, room for ${next.cap} more boards for ${money(next.price)}.`:" You own every property: this is as big as storage gets."}</p></section>
+    <section class="panel">
+          <div class="panel-head"><h2>Quiver</h2><span class="label">${SQ.quiver().length} board${SQ.quiver().length>1?"s":""} · <a class="back" href="#boards" style="display:inline">Board shop</a> · <a class="back" href="#shaping" style="display:inline">Shaping Room</a></span></div>
+          <div class="quiver">${SQ.quiver().map(b=>`<div class="qb ${b.id===SQ.curBoard?"on":""}"><img class="thumb3d" data-thumb="myboard:${b.id}" alt="${esc(b.name)}">
+            <div class="panel-head"><h3>${esc(b.name)}</h3>${b.id===SQ.curBoard?'<span class="state live">Riding</span>':`<button class="btn small" data-equip="${b.id}">Ride this</button>`}</div>
+            <span class="hint">${SQ.boardDims(b)} · best in ${b.waves[0]}–${b.waves[1]} ft · ${b.fins} fins${b.custom?` · rated ${b.rating}/100`:""}</span>
+            <span class="hint qacc">${accLine(b.id)}</span>
+            <div class="cta-row"><button class="btn small ${custOpen===b.id?"primary":"ghost"}" data-cust="${b.id}">Customise</button>${b.soft?"":`<a class="back" href="#spray" data-spray-pick="${b.id}" style="display:inline">Spray this board</a>`}${b.id==="starter"?"":`<button class="btn small ghost" data-sell="${b.id}">${SQ.boardValue(b)?`Sell · ${money(SQ.boardValue(b))}`:"Give away"}</button>`}</div>
+            ${custOpen===b.id?custPanel(b.id):""}
+            <div class="rbars">${ratingBars(b)}</div></div>`).join("")}</div>
+    </section>
+    ${storagePanel()}
+  </main>`}
 function storagePanel(){const n=SQ.boardCount(),cap=SQ.storeCap(),own=SQ.career.props||{};
-  return `<section class="panel" id="storage"><div class="panel-head"><h2>Board storage</h2><span class="label">${n}/${cap} boards</span></div>
+  return `<section class="panel" id="storage"><div class="panel-head"><h2>Upgrade your storage</h2><span class="label">${n}/${cap} boards</span></div>
     <div class="sprow"><span>Racks used</span><span class="cbar"><i style="width:${Math.min(100,n/cap*100).toFixed(0)}%"></i></span><b>${n}/${cap}</b></div>
-    <p class="hint">You start with room for ${SQ.STORE_BASE} boards. Each property adds racks. When they're full you can't buy or shape another board until you buy a property or sell one from your quiver.</p>
+    <p class="hint">You start with room for ${SQ.STORE_BASE} boards. Buy a property to upgrade: each one adds racks, and they're yours for good. When the racks are full you can't buy or shape another board until you buy a property or sell one from your quiver.</p>
     <div class="props">${SQ.PROPS.map(p=>`<div class="prop ${own[p.id]?"on":""}"><b>${esc(p.n)}</b><span class="hint">${esc(p.what)} · room for ${p.cap} more boards</span>${own[p.id]?'<span class="state live">Yours</span>':`<button class="btn small primary" data-prop="${p.id}" ${SQ.career.money<p.price?"disabled":""}>Buy · ${money(p.price)}</button>`}</div>`).join("")}</div></section>`}
 document.addEventListener("click",e=>{const p=e.target.closest("[data-prop]"),b=e.target.closest("[data-sell]");
   if(p){const P=SQ.PROPS.find(x=>x.id===p.dataset.prop);if(!P||!confirm(`Buy ${P.what.toLowerCase()} for ${money(P.price)}?`))return;const r=SQ.buyProp(P.id);toast(r.msg);if(r.ok){save();purse();netPush(true);rerender()}return}
@@ -5240,7 +5253,7 @@ function shopView(kind){
   const C=SQ.career;let tabs,items,title,lede,champs="";
   if(kind==="boards"){title="Surfboard Shop";lede="Real board models with stock dimensions. Better boards unlock as you level up. Any board except a soft-top can snap on a heavy wipeout.";
     if(Date.now()-REP.at>30000&&typeof NET!=="undefined"&&NET.client&&NET.user){REP.at=Date.now();setTimeout(()=>netRep().then(()=>{if(location.hash==="#boards")rerender()}),0)}
-    champs=`<p class="hint">Board storage: <b>${SQ.boardCount()}/${SQ.storeCap()}</b>. ${SQ.boardCount()>=SQ.storeCap()?"<b>Full.</b> Buy a property or sell a board on your Profile page.":"More room comes with properties (Profile page)."}</p>`+champBoardsHTML()+shelfHTML();tabs=SQ.BOARD_CATS;const cur=shopCat.boards;items=Object.values(SQ.BOARDS).filter(b=>b.cat===cur&&!b.notSold&&(!b.base||b.base===b.id)).sort((a,b)=>a.level-b.level||a.price-b.price).map(boardCard)}
+    champs=`<p class="hint">Board storage: <b>${SQ.boardCount()}/${SQ.storeCap()}</b>. ${SQ.boardCount()>=SQ.storeCap()?"<b>Full.</b> Buy a property or sell a board in the Board Room.":"More room comes with properties (Profile page)."}</p>`+champBoardsHTML()+shelfHTML();tabs=SQ.BOARD_CATS;const cur=shopCat.boards;items=Object.values(SQ.BOARDS).filter(b=>b.cat===cur&&!b.notSold&&(!b.base||b.base===b.id)).sort((a,b)=>a.level-b.level||a.price-b.price).map(boardCard)}
   else{const slots=kind==="apparel"?["shorts","top","suit","hat"]:["fins","leash","pad","travel","storm"];
     title=kind==="apparel"?"Apparel Shop":"Accessories";lede=kind==="apparel"?"Boardshorts, rash vests, springsuits, wetsuits and hats. What you wear shows on your surfer.":"Fins, leashes and tailpads change how your board surfs. Each set goes on one board: fit it from Customise in your quiver. Fins only fit boards with the same fin system. Stronger leashes cost more, break less and make your board less likely to snap. Travel tickets are here too.";
     tabs=["all",...slots];const cur=shopCat[kind];items=SQ.GEAR.filter(g=>slots.includes(g.slot)&&(cur==="all"||g.slot===cur)).sort((a,b)=>a.level-b.level||a.price-b.price).map(gearCard)}
@@ -5257,7 +5270,7 @@ function shopView(kind){
   </main>`;
 }
 function rerender(){const v=(location.hash||"#home").slice(1);const app=$("#app");
-  if(v==="boards"||v==="apparel"||v==="accessories")app.innerHTML=shopView(v);else if(v==="profile")app.innerHTML=profileView();else if(v==="map")app.innerHTML=mapView();else if(v==="leaderboards")app.innerHTML=leaderboardsView();else if(v==="hall")app.innerHTML=hallView();else if(v==="teams")app.innerHTML=teamsView();else if(v==="heats")app.innerHTML=heatsView();purse()}
+  if(v==="boards"||v==="apparel"||v==="accessories")app.innerHTML=shopView(v);else if(v==="profile")app.innerHTML=profileView();else if(v==="boardroom")app.innerHTML=boardRoomView();else if(v==="map")app.innerHTML=mapView();else if(v==="leaderboards")app.innerHTML=leaderboardsView();else if(v==="hall")app.innerHTML=hallView();else if(v==="teams")app.innerHTML=teamsView();else if(v==="heats")app.innerHTML=heatsView();purse()}
 
 /* ---------- Section 5: world map ---------- */
 let mapSel=null;
@@ -5334,11 +5347,12 @@ function mapView(){
       <div class="tablewrap"><table class="maptab"><thead><tr><th>Today</th><th>Break</th><th>Surf</th><th>Wind</th><th>Tickets</th><th>Pay</th></tr></thead><tbody>${rows}</tbody></table></div></section>
     <section class="panel">${challengesPanel("ch-m")}</section>
     <section class="panel">${missionsPanel("ms-m")}</section>
+    <section class="panel rkpanel" id="rkpanel">${rankPanel("rk-m")}</section>
   </main>`;
 }
 
 /* ---------- router ---------- */
-const VIEWS=new Set(["home","profile","leaderboards","achievements","hall","teams","create","look","play","map","forecast","boards","apparel","accessories","shaping","spray","account","heats"]);
+const VIEWS=new Set(["home","profile","boardroom","leaderboards","achievements","hall","teams","create","look","play","map","forecast","boards","apparel","accessories","shaping","spray","account","heats"]);
 function route(){
   cancelAnimationFrame(raf);
   let v=(location.hash||"#home").slice(1);
@@ -5361,6 +5375,7 @@ function route(){
     app.innerHTML=creatorView();
   }else if(v==="home"){editing=false;app.innerHTML=homeView();startSea()}
   else if(v==="profile"){editing=false;app.innerHTML=profileView()}
+  else if(v==="boardroom")app.innerHTML=boardRoomView();
   else if(v==="leaderboards")app.innerHTML=leaderboardsView();
   else if(v==="hall")app.innerHTML=hallView();
   else if(v==="teams")app.innerHTML=teamsView();
@@ -5857,8 +5872,8 @@ document.addEventListener("click",e=>{
     if(k==="pay"){if(!SP||!SP.pick)return;const r=SQ.payRoom("spray");const m=$("#spMsg");if(!r.ok){if(m)m.textContent=r.msg;return}
       SP={paid:true,id:SP.pick,side:"deck",tool:"spray",tpl:"rail",act:1,c:["#2fe0cf","#1d6fc4"],size:34,rail:"1"};purse();route();return}
     if(!SP||!SP.paid)return;
-    if(k==="cancel"){if(confirm("Leave without saving? The spray fee isn't refunded.")){SP=null;location.hash="#profile"}return}
-    if(k==="save"){const r=spSave();if(r.ok){toast("Design saved. It's on your board now.");SP=null;location.hash="#profile"}else toast(r.msg);return}
+    if(k==="cancel"){if(confirm("Leave without saving? The spray fee isn't refunded.")){SP=null;location.hash="#boardroom"}return}
+    if(k==="save"){const r=spSave();if(r.ok){toast("Design saved. It's on your board now.");SP=null;location.hash="#boardroom"}else toast(r.msg);return}
     if(k==="side")SP.side=val;
     else if(k==="tool")SP.tool=val;
     else if(k==="act"){SP.act=+val;const cu=$("#spCustom");if(cu)cu.value=SP.c[SP.act-1]}
@@ -6676,6 +6691,49 @@ function lgAmateurRows(){const me=NET.user.id,L=(LG.elig||[]).filter(p=>!(LG.row
   const i=L.findIndex(p=>p.id===me),show=L.slice(0,10);
   const row=(p,k)=>`<li class="${p.id===me?"me":""}"><span class="rk">${31+k}</span><span class="who">${lgFlag(p.country)} <b><a href="javascript:void 0" class="cablink" data-cab="${esc(p.id)}" data-cabn="${esc(p.username)}">${esc(p.username)}</a></b></span><span class="hint">Level ${p.level||"?"}</span><b class="pts">${Math.round(p.rating||1000)}</b></li>`;
   return L.length?`<ol class="wslrank">${show.map(row).join("")}${i>=10?row(L[i],i):""}</ol>`:'<p class="hint">No sponsored amateurs yet.</p>'}
+/* ---------- Rankings board (home and map pages): WSL Tour 1-12, Challenger Series 13-30, amateurs 31st and below, each with their sponsor ---------- */
+const RK={tab:null,sp:{},spAt:{},busy:false};
+const RK_TABS=[["am","Amateur","31st and below"],["cs","Challenger Series","13th to 30th"],["wsl","WSL Tour","1st to 12th"]];
+function rkSponsor(id,bot,tour){
+  if(NET.user&&id===NET.user.id){const c=SQ.career.sponsor;return c?{k:c.k,name:c.name}:null}
+  if(bot){// computer surfers carry a brand from their tour's sponsor tier, always the same one for the same surfer
+    const L=Object.values(SQ.SP_BY).filter(b=>b.t===(tour==="wsl"?2:1));return L[h32(String(id))%L.length]}
+  return RK.sp[id]||null}
+function rkRows(){const me=NET.user&&NET.user.id,tab=RK.tab;
+  const spTag=(o)=>{const sp=o?rkSponsor(o.id,o.bot,o.tour):null;return sp?`<span class="rksp">${rkLogo(sp.k)}${esc(sp.name)}</span>`:'<span class="rksp none">No sponsor</span>'};
+  const li=(rank,o,name,val,sub)=>`<li class="${o.id===me?"you":""}"><span class="rk">${rank}</span><span class="who"><b>${lgFlag(o.country)} ${o.bot?esc(name):`<a href="javascript:void 0" class="cablink" data-cab="${esc(o.id)}" data-cabn="${esc(name)}">${esc(name)}</a>`}${o.bot?' <i class="botag" title="Computer surfer">CPU</i>':""}</b>${spTag(o)}</span><span class="val">${val}<small>${sub}</small></span></li>`;
+  if(tab==="am"){const L=(LG.elig||[]).filter(p=>!(LG.row&&[...LG.row.wsl,...LG.row.cs].some(m=>m.id===p.id)));if(!L.length)return '<p class="hint">No sponsored amateurs yet. Reach level 15, win 10 heats and sign a minor sponsor to be the first.</p>';
+    const i=L.findIndex(p=>p.id===me),show=L.slice(0,15);if(i>=15)show.push(L[i]);
+    return `<ol class="rklist">${show.map(p=>li(31+L.indexOf(p),p,p.username,Math.round(p.rating||1000),"rating")).join("")}</ol>`}
+  const R=LG.row;if(!R)return "";const st=lgStandings(tab,wslSeason(),LG.events,R[tab]),start=tab==="wsl"?1:13;
+  return `<ol class="rklist">${st.map((o,i)=>li(start+i,Object.assign({tour:tab},o),o.name,o.pts.toLocaleString("en-AU"),"pts")).join("")}</ol>`}
+const rkLogo=k=>{const L=SQ.LOGOS&&SQ.LOGOS["sp_"+k];return L&&L.uri?`<img src="${L.uri}" alt="">`:""};
+function rankPanel(hid){
+  if(!RK.tab){const l=SQ.ladIdx();RK.tab=l===2?"wsl":l===1?"cs":"am"}
+  const T=RK_TABS.find(t=>t[0]===RK.tab);
+  let body;
+  if(!onlineOn()||!NET.user)body='<p class="hint">Sign in to see the rankings.</p>';
+  else if(LG.err&&!LG.row)body=`<p class="hint">Couldn't load the rankings: ${esc(LG.err)}</p>`;
+  else if(!LG.row)body='<p class="hint">Loading the rankings…</p>';
+  else body=rkRows();
+  if(onlineOn()&&NET.user)setTimeout(rkLoad,0);
+  return `<div class="panel-head"><h2 id="${hid}">Rankings</h2><span class="label">${esc(T[2])}${LG.row?` · ${wslName(wslSeason())}`:""}</span></div>
+    <div class="tabs" role="tablist">${RK_TABS.map(([id,l])=>`<button class="tab" role="tab" aria-selected="${id===RK.tab}" data-rk="${id}">${l}</button>`).join("")}</div>
+    ${body}
+    <p class="note">${RK.tab==="am"?"Sponsored amateurs, ranked by heat rating. The top 2 move up to the Challenger Series each month.":RK.tab==="cs"?"This month's points. The top 2 move up to the WSL Tour, the bottom 2 drop to the amateurs.":"This month's points. 1st at the end of the month is World Champion; the bottom 2 drop to the Challenger Series."}</p>`}
+function rkRender(){const p=document.getElementById("rkpanel");if(!p)return;const h=p.querySelector("h2");p.innerHTML=rankPanel(h?h.id:"rk-h")}
+/* the league (when it's over a minute old) and the sponsors of the surfers on show */
+async function rkLoad(){if(RK.busy||!NET.client||!NET.user)return;RK.busy=true;
+  try{let changed=false;
+    if(!LG.busy&&Date.now()-LG.at>60000){await netLeague();changed=true}
+    else if(Date.now()-LG.eligAt>60000){LG.eligAt=Date.now();LG.elig=await lgEligible();changed=true}
+    const ids=RK.tab==="am"?(LG.elig||[]).map(p=>p.id):((LG.row&&LG.row[RK.tab])||[]).filter(m=>!m.bot).map(m=>m.id);
+    const need=ids.filter(id=>id!==NET.user.id&&!(Date.now()-(RK.spAt[id]||0)<120000));
+    if(need.length){need.forEach(id=>RK.spAt[id]=Date.now());const {data,error}=await NET.client.from("profiles").select("id,cabinet").in("id",need);
+      if(!error){(data||[]).forEach(r=>{const c=r.cabinet&&(r.cabinet.sponsors||[]).find(x=>x.cur);RK.sp[r.id]=c?{k:c.k,name:c.name}:null;RK.spAt[r.id]=Date.now()});changed=true}}
+    if(changed)rkRender();
+  }catch(e){console.warn("Rankings:",e)}finally{RK.busy=false}}
+document.addEventListener("click",e=>{const b=e.target.closest("[data-rk]");if(!b)return;RK.tab=b.dataset.rk;rkRender()});
 function ladderPanel(){const C=SQ.career,lad=SQ.ladIdx(),st=SQ.sponsorStatus(),h=st.have,last=LG.row&&LG.row.last;
   const bar=(lab,v,need)=>`<div class="sprow"><span>${lab}</span><span class="cbar"><i style="width:${Math.min(100,v/need*100).toFixed(0)}%"></i></span><b>${Math.min(v,need)}/${need}</b></div>`;
   const steps=SQ.LADDER.map((t,i)=>`<li class="${i<lad?"done":i===lad?"on":""}"><b>${esc(t.n)}</b><small>${i===0?"Local heats at your home break":i===1?"18 surfers · weekly events":"12 surfers · the World Championship"}</small></li>`).join("");
@@ -6690,16 +6748,18 @@ function ladderPanel(){const C=SQ.career,lad=SQ.ladIdx(),st=SQ.sponsorStatus(),h
 /* ---------- local heats against the computer ---------- */
 const LH={mins:5};
 function idleOnline(){return (LOBBY.online||[]).filter(o=>!o.busy).length}
-function localPanel(){const C=SQ.career,home=C.home&&SQ.BREAKS[C.home]?C.home:"snapper",opts=Object.entries(SQ.BREAKS).filter(([k,b])=>!b.big&&!SQ.tierLock(k));
+const wasSponsored=()=>{const C=SQ.career;return !!(C.sponsor||(C.spHist||[]).length)};
+function localPanel(){const C=SQ.career,signed=wasSponsored(),home=C.home&&SQ.BREAKS[C.home]?C.home:"snapper",opts=Object.entries(SQ.BREAKS).filter(([k,b])=>!b.big&&!SQ.tierLock(k));
   const crowd=NET.user&&idleOnline()>=2;
   return `<section class="panel" id="local"><div class="panel-head"><h2>Local heats</h2><span class="label">Home break: ${esc(SQ.BREAKS[home].name)}</span></div>
-    <p class="hint">Amateurs start at home. Win local heats to build your record: <b>10 heat wins</b> and <b>level 15</b> bring the first sponsor offers.</p>
+    <p class="hint">${signed?`${C.sponsor?`You're sponsored by <b>${esc(C.sponsor.name)}</b>`:"You've had a sponsor"}, so the computer surfers at home won't take you on any more. Your heat wins and rating now come from live heats against real surfers.`:"Amateurs start at home. Win local heats to build your record: <b>10 heat wins</b> and <b>level 15</b> bring the first sponsor offers."}</p>
     <div class="hsel two"><label class="shsl hcountry">Home break<select id="lhHome">${opts.map(([k,b])=>`<option value="${k}" ${k===home?"selected":""}>${esc(b.name)}</option>`).join("")}</select></label>
     <label class="shsl hcountry">Heat length<select id="lhLen">${[3,4,5,6,8,10].map(n=>`<option value="${n}" ${n===LH.mins?"selected":""}>${n} minutes</option>`).join("")}</select></label></div>
     <p class="hint">More breaks open when you reach the Challenger Series and the WSL Tour. Change your home break any time.</p>
-    ${crowd?`<p class="hint"><b>${idleOnline()} surfers are online.</b> Computer surfers stay out of the water when there's a crowd: invite them for a live heat below.</p>`
+    ${signed?`<p class="hint">Invite surfers who are online for a live heat below.${C.sponsor&&C.sponsor.tier===0?` ${esc(C.sponsor.name)} still pays you for every one you surf.`:""}</p>`:crowd?`<p class="hint"><b>${idleOnline()} surfers are online.</b> Computer surfers stay out of the water when there's a crowd: invite them for a live heat below.</p>`
       :`<div class="cta-row"><button class="btn primary" data-local ${SQ.heat.active?"disabled":""}>Surf a local heat vs a computer surfer</button></div><p class="hint">The locals range from beginners to rippers. Their scores come in as the heat goes on.</p>`}</section>`}
 function localHeat(){if(SQ.heat.active||LOBBY.pending||LOBBY.heatCh){toast("Finish what you're doing first");return}
+  if(wasSponsored()){toast("Sponsored surfers don't race the computer surfers. Invite a real surfer for a live heat.");rerender();return}
   if(NET.user&&idleOnline()>=2){toast("There's a crowd online: invite them for a live heat");return}
   const C=SQ.career,brk=C.home&&SQ.BREAKS[C.home]&&!SQ.tierLock(C.home)?C.home:"snapper",bots=localBots(brk),o=bots[Math.floor(Math.random()*bots.length)];
   const id="L"+Date.now().toString(36)+Math.random().toString(36).slice(2,6),mins=LH.mins||5;
