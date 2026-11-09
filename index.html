@@ -5916,7 +5916,9 @@ function pubStats(){const C=SQ.career,s=state.stats,h=heatRec();const o={level:C
   if(!NET.noHeatCols)Object.assign(o,{heat_wins:h.w,heat_losses:h.l,heat_draws:h.d,rating:Math.round(h.rating)});
   if(!NET.noRecCols){const R=C.recs||{};RECS.forEach(([k])=>o["rec_"+k]=+(R[k]||0))}
   if(!NET.noCabCol)o.cabinet=cabinetData();
-  if(!NET.noLadCol)o.lad_elig=SQ.ladIdx()===0&&!!(C.sponsor&&C.sponsor.tier!=null)&&SQ.sponsorStatus().ok;return o}
+  if(!NET.noLadCol)o.lad_elig=ladElig();return o}
+/* an amateur who can move up: on no tour yet, with a sponsor signed */
+const ladElig=()=>{const C=SQ.career;return SQ.ladIdx()===0&&!!(C.sponsor&&C.sponsor.tier!=null)&&SQ.sponsorStatus().ok};
 const missingCol=e=>e&&/heat_|rating|column|schema cache/i.test(e.message||"");
 const bundle=()=>({v:1,s:state,c:SQ.career,t:Date.now()});
 async function netPush(force){
@@ -6572,6 +6574,7 @@ async function netLeague(){
       const again=await NET.client.from("league").select("*").eq("id","main").maybeSingle();if(again.error)throw again.error;row=again.data}
     if(!row||!Array.isArray(row.wsl)||!Array.isArray(row.cs)||typeof row.season!=="string")throw new Error("The league data looks damaged.");
     LG.row=row;if(row.season<wslSeason())await lgRollover();
+    if(!LG.colsOK){LG.colsOK=1;if(NET.noLadCol||NET.noCabCol||NET.noRecCols){NET.noLadCol=NET.noCabCol=NET.noRecCols=false;netPush(true)}}   // the tour tables answer, so the database set-up is in: send what failed before it was
     // this week's events
     const s=wslSeason(),wk=lgWeek();
     for(const tour of ["wsl","cs"]){const id=`${tour}-${s}-${wk}`;
@@ -6702,7 +6705,8 @@ function rkSponsor(id,bot,tour){
 function rkRows(){const me=NET.user&&NET.user.id,tab=RK.tab;
   const spTag=(o)=>{const sp=o?rkSponsor(o.id,o.bot,o.tour):null;return sp?`<span class="rksp">${rkLogo(sp.k)}${esc(sp.name)}</span>`:'<span class="rksp none">No sponsor</span>'};
   const li=(rank,o,name,val,sub)=>`<li class="${o.id===me?"you":""}"><span class="rk">${rank}</span><span class="who"><b>${lgFlag(o.country)} ${o.bot?esc(name):`<a href="javascript:void 0" class="cablink" data-cab="${esc(o.id)}" data-cabn="${esc(name)}">${esc(name)}</a>`}${o.bot?' <i class="botag" title="Computer surfer">CPU</i>':""}</b>${spTag(o)}</span><span class="val">${val}<small>${sub}</small></span></li>`;
-  if(tab==="am"){const L=(LG.elig||[]).filter(p=>!(LG.row&&[...LG.row.wsl,...LG.row.cs].some(m=>m.id===p.id)));if(!L.length)return '<p class="hint">No sponsored amateurs yet. Reach level 15, win 10 heats and sign a minor sponsor to be the first.</p>';
+  if(tab==="am"){const L=(LG.elig||[]).filter(p=>!(LG.row&&[...LG.row.wsl,...LG.row.cs].some(m=>m.id===p.id)));
+    if(me&&ladElig()&&!L.some(p=>p.id===me)){L.push({id:me,username:NET.name||"You",country:myCountry(),rating:Math.round(heatRec().rating),level:SQ.career.level});L.sort((a,b)=>(b.rating||1000)-(a.rating||1000))}if(!L.length)return '<p class="hint">No sponsored amateurs yet. Reach level 15, win 10 heats and sign a minor sponsor to be the first.</p>';
     const i=L.findIndex(p=>p.id===me),show=L.slice(0,15);if(i>=15)show.push(L[i]);
     return `<ol class="rklist">${show.map(p=>li(31+L.indexOf(p),p,p.username,Math.round(p.rating||1000),"rating")).join("")}</ol>`}
   const R=LG.row;if(!R)return "";const st=lgStandings(tab,wslSeason(),LG.events,R[tab]),start=tab==="wsl"?1:13;
@@ -6727,6 +6731,9 @@ async function rkLoad(){if(RK.busy||!NET.client||!NET.user)return;RK.busy=true;
   try{let changed=false;
     if(!LG.busy&&Date.now()-LG.at>60000){await netLeague();changed=true}
     else if(Date.now()-LG.eligAt>60000){LG.eligAt=Date.now();LG.elig=await lgEligible();changed=true}
+    if(LG.row&&ladElig()&&!(LG.elig||[]).some(p=>p.id===NET.user.id)&&!RK.fixed){RK.fixed=true;
+      NET.noLadCol=false;NET.noCabCol=false;NET.noRecCols=false;
+      const r=await netPush(true);if(r&&r.ok){LG.elig=await lgEligible();LG.eligAt=Date.now()}changed=true}
     const ids=RK.tab==="am"?(LG.elig||[]).map(p=>p.id):((LG.row&&LG.row[RK.tab])||[]).filter(m=>!m.bot).map(m=>m.id);
     const need=ids.filter(id=>id!==NET.user.id&&!(Date.now()-(RK.spAt[id]||0)<120000));
     if(need.length){need.forEach(id=>RK.spAt[id]=Date.now());const {data,error}=await NET.client.from("profiles").select("id,cabinet").in("id",need);
