@@ -828,12 +828,36 @@ function makeWave(z){
   const nx=Math.min(Q.nxMax,Math.round(Q.nx*Math.max(1,(P.span+50)/200))),n=nx*NU;
   const g=new THREE.BufferGeometry();
   g.setAttribute("position",new THREE.BufferAttribute(new Float32Array(n*3),3));
-  g.setAttribute("normal",new THREE.BufferAttribute(new Float32Array(n*3),3));
-  ["aFoam","aThin","aAo","aHr"].forEach(k=>g.setAttribute(k,new THREE.BufferAttribute(new Float32Array(n),1)));
+  // compact storage: the normals and the foam/thin/shade values go to the graphics card as 16-bit numbers instead of 32-bit
+  // (about 30% less to send every frame; the rounding is far below one shade of colour on screen). Height stays full precision.
+  g.setAttribute("normal",new THREE.BufferAttribute(new Int16Array(n*3),3,true));
+  ["aFoam","aThin","aAo"].forEach(k=>g.setAttribute(k,new THREE.BufferAttribute(new Uint16Array(n),1,true)));
+  g.setAttribute("aHr",new THREE.BufferAttribute(new Float32Array(n),1));
   g.setIndex(makeIndex(nx));
   const mesh=new THREE.Mesh(g,waveMat);mesh.frustumCulled=false;scene.add(mesh);
   g.boundingSphere=new THREE.Sphere(new THREE.Vector3(),1e5);
-  return {mesh,pile:qualityId==="low"?null:makeFoamPile(nx),nx,z,peeling:false,peelX:0,d:new Float32Array(nx),Hc:new Float32Array(nx),c:new Float32Array(nx),b:new Float32Array(nx),fade:1,seed:Math.random()*100};
+  return {mesh,pile:qualityId==="low"?null:makeFoamPile(nx),nrm:new Float32Array(n*3),nx,z,peeling:false,peelX:0,d:new Float32Array(nx),Hc:new Float32Array(nx),c:new Float32Array(nx),b:new Float32Array(nx),fade:1,seed:Math.random()*100};
+}
+/* The wave's surface normals (which way each point faces, for the light and reflections).
+   This does exactly the same sums, in the same order, as three.js computeVertexNormals(), so the result is identical to the last bit,
+   but it walks the wave's regular grid directly instead of going through the general-purpose version, which is many times slower. */
+const q16=v=>v<=0?0:v>=1?65535:Math.round(v*65535);
+function gridNormals(g,nx,n){
+  const p=g.attributes.position.array;n.fill(0);
+  for(let i=0;i<nx-1;i++)for(let j=0;j<NU-1;j++){
+    const a=i*NU+j,b=a+NU,c=a+1,d=b+1;
+    for(let t=0;t<2;t++){
+      const A=(t?b:a)*3,B=(t?d:b)*3,C=c*3;
+      const pbx=p[B],pby=p[B+1],pbz=p[B+2];
+      const cbx=p[C]-pbx,cby=p[C+1]-pby,cbz=p[C+2]-pbz,abx=p[A]-pbx,aby=p[A+1]-pby,abz=p[A+2]-pbz;
+      const x=cby*abz-cbz*aby,y=cbz*abx-cbx*abz,z=cbx*aby-cby*abx;
+      n[A]+=x;n[A+1]+=y;n[A+2]+=z;n[B]+=x;n[B+1]+=y;n[B+2]+=z;n[C]+=x;n[C+1]+=y;n[C+2]+=z;
+    }
+  }
+  for(let k=0,L=n.length;k<L;k+=3){const x=n[k],y=n[k+1],z=n[k+2],l=Math.sqrt(x*x+y*y+z*z)||1,s=1/l;n[k]=x*s;n[k+1]=y*s;n[k+2]=z*s}
+  const o=g.attributes.normal.array;
+  if(o!==n){for(let k=0,L=n.length;k<L;k++)o[k]=Math.round(n[k]*32767)}   // to the compact 16-bit copy the graphics card reads
+  g.attributes.normal.needsUpdate=true;
 }
 function disposeWave(W){scene.remove(W.mesh);W.mesh.geometry.dispose();if(W.pile){scene.remove(W.pile);W.pile.geometry.dispose()}}
 
@@ -883,7 +907,7 @@ function updateWave(W,t){
       let y=ly;
       if(brk>0)y+=brk*Hc*.13*Math.sin(x*.9+t*3.1+j*.7+W.seed)*Math.sin(x*.37-t*2.2+j*1.3);
       const k=(base+j)*3;pos[k]=x;pos[k+1]=y;pos[k+2]=W.z+lz;
-      foam[base+j]=f;thin[base+j]=tn;ao[base+j]=o;hrA[base+j]=Hc>0?ly/Math.max(H,.5):0;j++;
+      foam[base+j]=q16(f);thin[base+j]=q16(tn);ao[base+j]=q16(o);hrA[base+j]=Hc>0?ly/Math.max(H,.5):0;j++;
     };
     for(let s=0;s<NB;s++){const u=s/(NB-1);const e=Math.pow(.5-.5*Math.cos(Math.PI*u),1.25);
       put(lerp(zb,cz,u),cy*e,b*.5*u,.6*sstep(.65,1,u)*(1-b)*(Hc>0?1:0),1,0)}
@@ -916,7 +940,7 @@ function updateWave(W,t){
   if(W.pile){const pg=W.pile.geometry;pg.attributes.position.needsUpdate=true;pg.attributes.aF.needsUpdate=true;pg.attributes.normal.needsUpdate=true}
   g.attributes.position.needsUpdate=true;
   ["aFoam","aThin","aAo","aHr"].forEach(k=>g.attributes[k].needsUpdate=true);
-  g.computeVertexNormals();
+  gridNormals(g,nx,W.nrm);
 }
 
 /* ---------- spray & mist particles ---------- */
@@ -3174,7 +3198,7 @@ function setQuality(id,auto){qualityId=id;Q=QUALITY[id];if(!auto)prCap=null;rend
   waveMat.dispose();oceanMat.dispose();waveMat=makeWaterMat(WAVE_VERT);oceanMat=makeWaterMat(OCEAN_VERT);
   buildOcean();buildParticles();buildSpray();
   // keep each wave (and everything about it: heat ids, closeouts, sections) and only swap its meshes for the new quality
-  waves.forEach(W=>{const n=makeWave(W.z);disposeWave(W);W.mesh=n.mesh;W.pile=n.pile;W.nx=n.nx;W.d=n.d;W.Hc=n.Hc;W.c=n.c;W.b=n.b;W.xs=null;W.pileTmp=null;W.dirty=true;updateWave(W,simT)});
+  waves.forEach(W=>{const n=makeWave(W.z);disposeWave(W);W.mesh=n.mesh;W.pile=n.pile;W.nrm=n.nrm;W.nx=n.nx;W.d=n.d;W.Hc=n.Hc;W.c=n.c;W.b=n.b;W.xs=null;W.pileTmp=null;W.pHid=null;W.dirty=true;updateWave(W,simT)});
   resize();document.querySelectorAll("#quals .b").forEach(b=>b.setAttribute("aria-pressed",b.dataset.q===id))}
 document.getElementById("cams").innerHTML=CAMS.map(([id,l])=>`<button class="b" data-cam="${id}" aria-pressed="${id===camMode}">${l}</button>`).join("");
 document.getElementById("quals").innerHTML=Object.entries(QUALITY).map(([id,q])=>`<button class="b" data-q="${id}" aria-pressed="${id===qualityId}">${q.label}</button>`).join("");
@@ -3948,7 +3972,12 @@ window.SQ={
   onRide:null
 };
 requestAnimationFrame(frame);
-window.__sq={get scene(){return scene},judge(R,o,sig){const k=career.sig;career.sig=sig||null;try{return judgeRide(R,o)}finally{career.sig=k}},kick(){endRide("Kicked out","You kicked out over the back of the wave.",true)},shot(q){return renderer.domElement.toDataURL("image/jpeg",q||.92)},mkBoard(id,acc){const b=BOARDS[id];return makeBoard(b,Object.assign(boardAcc(b),acc||{}),{stock:true,noSponsor:true})},feet(){const spec=BOARDS[curBoard];surfer.updateMatrixWorld(true);return [rig.shinL,rig.shinR].map(sh=>{const p=surfer.worldToLocal(sh.end.getWorldPosition(new THREE.Vector3()));const u=Math.max(-1,Math.min(1,p.x/(.925*spec.sx)));return [p.x,p.z,p.y-.03-spec.sy*deckTop(u,spec)]})},trick(t,s){trickCall(t,s)},starGive(id,k){return starGive(id,k)},get perfInfo(){return {perf,qualityPicked,qualityId,pr:renderer.getPixelRatio(),mode}},hw(){return waves.map(w=>({hid:w.hid,z:w.z,peel:!!w.peeling,took:w.oppTook||null,peelX:w.peelX,at:w.at,seed:w.seed}))},surfY(x,z,id){const W=waves.find(w=>w.hid===id);return W?sample(W,x,z).y:NaN},get camera(){return camera},setFlipSign(s){FLIPS=s},get rigRef(){return rig},get surferRef(){return surfer},probe(){const R=ride;if(!R)return {mode};const S=sample(R.W,R.x,R.z);return {d:+(S.d/P.H).toFixed(2),c:+S.c.toFixed(2),ff:+R.ff.toFixed(2),inB:R.inBarrel,H:+P.H.toFixed(1),s:+R.s.toFixed(1),y:+R.y.toFixed(1),mode,air:!!R.air}},grant(id){career.boards[id]={owned:true};saveCareer();equipBoard(id)},get P(){return P},get career(){return career},get dir(){return P.dir},get H(){return P.H},step(n){for(let i=0;i<n;i++)tick(1/30);renderer.render(scene,camera)},get t(){return simT},get wz(){return target&&target.W.z},get mode(){return mode},get REC(){return REC},get RP(){return RP},get sessionBest(){return sessionBest},replayKey(c){return replayKey({code:c,preventDefault(){}})},get ride(){return ride},input,pickAlong(a){const W=incomingWave();if(!W)return false;target={W,x:PEEL_START()+P.dir*a,along:a,stage:0,dzR:99};W.hot=true;W.boost=true;mode="paddle";return true},ringTapPerfect(){ringT=ringZone*1.8/360;ringTap()},setBreak,claim(a){const W=incomingWave();if(!W)return false;this.pickAlong(a);if(HEAT){HEAT.myClaimAt=heatNow();W.clock=false;heatSend({t:"claim",id:W.hid,at:Math.round(HEAT.myClaimAt)})}return W.hid},get heat(){return HEAT},get waves(){return waves.map(W=>({id:W.hid,z:+W.z.toFixed(1),pk:W.peeling,px:+W.peelX.toFixed(1),rem:!!W.remote,clk:!!W.clock}))},get prompt(){return document.getElementById("prompt").textContent}};
+window.__sq={get scene(){return scene},setQ(id){setQuality(id)},waveSync(){return waves.filter(W=>W.hid!=null).map(W=>[W.hid,+W.z.toFixed(2),+(W.peelX||0).toFixed(2),!!W.peeling])},normCheck(){const W=activeWave()||waves[0];if(!W)return null;const g=W.mesh.geometry,nx=W.nx;
+  const f=new THREE.BufferGeometry();f.setAttribute("position",g.attributes.position);f.setAttribute("normal",new THREE.BufferAttribute(new Float32Array(W.nrm.length),3));f.setIndex(g.index);
+  let t=performance.now();for(let k=0;k<5;k++)f.computeVertexNormals();const tThree=(performance.now()-t)/5,ref=f.attributes.normal.array;
+  t=performance.now();for(let k=0;k<5;k++)gridNormals(g,nx,W.nrm);const tGrid=(performance.now()-t)/5,a=W.nrm,q=g.attributes.normal.array;
+  let same=0,qd=0;for(let k=0;k<a.length;k++){if(a[k]===ref[k])same++;qd=Math.max(qd,Math.abs(q[k]/32767-a[k]))}
+  return {verts:a.length/3,tThree,tGrid,identical:same===a.length,mismatched:a.length-same,max16bitError:qd}},judge(R,o,sig){const k=career.sig;career.sig=sig||null;try{return judgeRide(R,o)}finally{career.sig=k}},kick(){endRide("Kicked out","You kicked out over the back of the wave.",true)},shot(q){return renderer.domElement.toDataURL("image/jpeg",q||.92)},mkBoard(id,acc){const b=BOARDS[id];return makeBoard(b,Object.assign(boardAcc(b),acc||{}),{stock:true,noSponsor:true})},feet(){const spec=BOARDS[curBoard];surfer.updateMatrixWorld(true);return [rig.shinL,rig.shinR].map(sh=>{const p=surfer.worldToLocal(sh.end.getWorldPosition(new THREE.Vector3()));const u=Math.max(-1,Math.min(1,p.x/(.925*spec.sx)));return [p.x,p.z,p.y-.03-spec.sy*deckTop(u,spec)]})},trick(t,s){trickCall(t,s)},starGive(id,k){return starGive(id,k)},get perfInfo(){return {perf,qualityPicked,qualityId,pr:renderer.getPixelRatio(),mode}},hw(){return waves.map(w=>({hid:w.hid,z:w.z,peel:!!w.peeling,took:w.oppTook||null,peelX:w.peelX,at:w.at,seed:w.seed}))},surfY(x,z,id){const W=waves.find(w=>w.hid===id);return W?sample(W,x,z).y:NaN},get camera(){return camera},setFlipSign(s){FLIPS=s},get rigRef(){return rig},get surferRef(){return surfer},probe(){const R=ride;if(!R)return {mode};const S=sample(R.W,R.x,R.z);return {d:+(S.d/P.H).toFixed(2),c:+S.c.toFixed(2),ff:+R.ff.toFixed(2),inB:R.inBarrel,H:+P.H.toFixed(1),s:+R.s.toFixed(1),y:+R.y.toFixed(1),mode,air:!!R.air}},grant(id){career.boards[id]={owned:true};saveCareer();equipBoard(id)},get P(){return P},get career(){return career},get dir(){return P.dir},get H(){return P.H},step(n){for(let i=0;i<n;i++)tick(1/30);renderer.render(scene,camera)},get t(){return simT},get wz(){return target&&target.W.z},get mode(){return mode},get REC(){return REC},get RP(){return RP},get sessionBest(){return sessionBest},replayKey(c){return replayKey({code:c,preventDefault(){}})},get ride(){return ride},input,pickAlong(a){const W=incomingWave();if(!W)return false;target={W,x:PEEL_START()+P.dir*a,along:a,stage:0,dzR:99};W.hot=true;W.boost=true;mode="paddle";return true},ringTapPerfect(){ringT=ringZone*1.8/360;ringTap()},setBreak,claim(a){const W=incomingWave();if(!W)return false;this.pickAlong(a);if(HEAT){HEAT.myClaimAt=heatNow();W.clock=false;heatSend({t:"claim",id:W.hid,at:Math.round(HEAT.myClaimAt)})}return W.hid},get heat(){return HEAT},get waves(){return waves.map(W=>({id:W.hid,z:+W.z.toFixed(1),pk:W.peeling,px:+W.peelX.toFixed(1),rem:!!W.remote,clk:!!W.clock}))},get prompt(){return document.getElementById("prompt").textContent}};
 })();
 </script>
 
