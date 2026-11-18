@@ -352,6 +352,8 @@ body.replaying .topr,body.replaying #breakTag,body.replaying #career,body.replay
 (function(){
 "use strict";
 if(!window.THREE){document.body.insertAdjacentHTML("beforeend",'<div class="fatal"><p>The 3D engine didn\'t load. Check your connection and reload the page.</p></div>');return}
+/* tailpad brand -> its logo. Up here because the board you ride is built at start-up, before the gear section further down */
+const PAD_LOGO={"Creatures of Leisure":"pad_col","FCS":"pad_fcs","Futures":"pad_futures","Octopus":"pad_octopus","On A Mission":"pad_oam"};
 /* ---------- break presets ---------- */
 /* dir -1 = right-hander, dir 1 = left-hander; aframe = a peak that peels both ways (dir is the longer, scored side) */
 const BREAKS={
@@ -3512,7 +3514,6 @@ const CAREER_DEFAULT=()=>({v:2,money:20,tickets:3,level:1,xp:0,waves:0,best:0,bo
 /* ---------- what's fitted to the board: fin and tailpad colours ---------- */
 function boardAcc(spec){const I=instOf(spec.id),f=I.fins&&GEAR_BY[I.fins],p=I.pad&&GEAR_BY[I.pad],fok=f&&f.sys===spec.fins;
   return {fin:fok?f.ink:null,finBrand:fok?f.brand:null,finName:fok?f.name:null,pad:p?p.ink:null,padLogo:p?PAD_LOGO[p.brand]||null:null}}
-const PAD_LOGO={"Creatures of Leisure":"pad_col","FCS":"pad_fcs","Futures":"pad_futures","Octopus":"pad_octopus","On A Mission":"pad_oam"};
 /* ---------- fins: a swept template with a foil, side fins toed in and canted out, printed like real sets ---------- */
 function finTex(style,col,brand){const FIN_TEX=finTex.c||(finTex.c=new Map()),k=style+"|"+col+"|"+brand;if(FIN_TEX.has(k))return FIN_TEX.get(k);
   const c=document.createElement("canvas");c.width=c.height=256;const x=c.getContext("2d"),base=new THREE.Color(col);
