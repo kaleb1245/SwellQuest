@@ -2,6 +2,32 @@
 <html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>SwellQuest</title>
 <meta name="claude:viewport-fit-sides" content="cover">
+<script>
+/* Start-up watcher: if the game crashes while starting, show what went wrong on screen instead of freezing on "Waiting for a set..." */
+(function(){
+  var BUILD="2026-11-18",errs=[],notes=[],t0=Date.now(),shown=false,firstErrAt=0;
+  function rec(m,s){if(window.SQ)return;m=String(m||"Unknown error");if(errs.some(function(x){return x.m===m.slice(0,300)}))return;errs.push({m:String(m||"Unknown error").slice(0,300),s:String(s||"").split("\n").slice(1,3).map(function(l){return l.trim()}).join(" · ").slice(0,220)});if(!firstErrAt)firstErrAt=Date.now()}
+  window.addEventListener("error",function(e){var el=e.target;if(el&&el!==window&&(el.src||el.href)){if(!window.SQ)notes.push("Couldn't load "+String(el.src||el.href).replace(/^https?:\/\//,"").slice(0,70));return}rec(e.message+(e.lineno?" (line "+e.lineno+")":""),e.error&&e.error.stack)},true);
+  window.addEventListener("unhandledrejection",function(e){var r=e.reason;rec(r&&r.message||r,r&&r.stack)});
+  var ce=console.error;console.error=function(){try{var m=Array.prototype.map.call(arguments,function(a){return a&&a.message||String(a)}).join(" ");if(/webgl|context/i.test(m))rec(m,"")}catch(x){}return ce.apply(console,arguments)};
+  function gfx(){var o=[];["webgl2","webgl"].forEach(function(k){var c=document.createElement("canvas"),why="";c.addEventListener("webglcontextcreationerror",function(ev){why=ev.statusMessage||""});var g=null;try{g=c.getContext(k)}catch(x){why=x.message}
+    if(!g){o.push((k==="webgl2"?"WebGL 2":"WebGL 1")+": off"+(why?" ("+why+")":""));return}var d=g.getExtension("WEBGL_debug_renderer_info");o.push((k==="webgl2"?"WebGL 2":"WebGL 1")+": on"+(d&&k==="webgl2"?" · "+g.getParameter(d.UNMASKED_RENDERER_WEBGL):""));var l=g.getExtension("WEBGL_lose_context");if(l)l.loseContext()});return o}
+  function esc(s){return String(s).replace(/[&<>"]/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]})}
+  function browser(){var u=navigator.userAgent,m=u.match(/(Edg|OPR|Chrome|Firefox|Version)\/([\d.]+)/);var n=m?{Edg:"Edge",OPR:"Opera",Chrome:"Chrome",Firefox:"Firefox",Version:"Safari"}[m[1]]+" "+m[2].split(".")[0]:"Unknown browser";var os=/Windows/.test(u)?"Windows":/Mac OS/.test(u)?"Mac":/CrOS/.test(u)?"Chromebook":/Linux/.test(u)?"Linux":"";return n+(os?" on "+os:"")}
+  function show(){if(shown||window.SQ||!document.body)return;shown=true;
+    var b=document.createElement("div");b.id="sqboot";b.setAttribute("role","alertdialog");b.setAttribute("aria-labelledby","sqboot-h");
+    var real=errs.filter(function(x){return !/^Script error\.?/.test(x.m)});if(real.length)errs=real;var e=errs.length?errs.slice(0,3).map(function(x){return '<li><b>'+esc(x.m)+'</b>'+(x.s?'<span>'+esc(x.s)+'</span>':'')+'</li>'}).join(""):'<li><b>No error was reported. The game just never finished starting.</b></li>';
+    b.innerHTML='<h2 id="sqboot-h">SwellQuest couldn\'t start</h2><p class="sqb-lead">Take a photo of this box and send it to the game\'s owner so it can be fixed.</p>'+
+      '<h3>What went wrong</h3><ul>'+e+'</ul>'+
+      '<h3>This computer</h3><ul class="sqb-sys"><li>'+esc(browser())+' · screen '+innerWidth+'×'+innerHeight+'</li>'+gfx().map(function(g){return '<li>'+esc(g)+'</li>'}).join("")+(notes.length?'<li>'+esc(notes.slice(0,3).join(" · "))+'</li>':'')+'<li>Game build '+BUILD+' · after '+((Date.now()-t0)/1000).toFixed(0)+' s</li></ul>'+
+      '<div class="sqb-act"><button type="button" id="sqboot-r">Reload</button><button type="button" id="sqboot-x" class="ghost">Close</button></div>';
+    var st=document.createElement("style");st.textContent="#sqboot{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);z-index:2147483000;width:min(620px,calc(100vw - 32px));max-height:calc(100vh - 32px);overflow:auto;background:#0b1424;color:#e9eff7;border:2px solid #ffa24c;border-radius:14px;padding:20px 22px;font:15px/1.5 system-ui,'Segoe UI',Arial,sans-serif;box-shadow:0 20px 60px rgba(0,0,0,.6)}#sqboot h2{margin:0 0 4px;font-size:22px}#sqboot h3{margin:14px 0 4px;font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:#9fb1c8}#sqboot .sqb-lead{margin:0;color:#ffcf9e}#sqboot ul{margin:0;padding-left:18px;display:grid;gap:4px;overflow-wrap:anywhere}#sqboot li span{display:block;font:12px/1.4 ui-monospace,Consolas,monospace;color:#9fb1c8}#sqboot li b{color:#ffb4b4;font-weight:600}#sqboot .sqb-sys li{color:#d3dce8}#sqboot .sqb-act{display:flex;gap:10px;margin-top:16px}#sqboot button{font:inherit;font-weight:700;padding:8px 18px;border-radius:8px;border:0;background:#ffa24c;color:#1a1008;cursor:pointer}#sqboot button.ghost{background:transparent;color:#e9eff7;border:1px solid #3b4c66}#sqboot button:focus-visible{outline:3px solid #fff;outline-offset:2px}";
+    document.head.appendChild(st);document.body.appendChild(b);
+    document.getElementById("sqboot-r").onclick=function(){location.reload()};document.getElementById("sqboot-x").onclick=function(){b.remove()};}
+  var iv=setInterval(function(){if(window.SQ){clearInterval(iv);console.error=ce;return}
+    var now=Date.now();if((firstErrAt&&now-firstErrAt>1500)||now-t0>20000){clearInterval(iv);show()}},500);
+})();
+</script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..900&family=Barlow:wght@400;500;600&family=Barlow+Condensed:wght@500;600;700&display=swap">
@@ -4141,6 +4167,8 @@ main{padding-block:28px 64px}
 .board-list{list-style:none;margin:0;padding:0;display:grid}
 .board-list li{display:grid;grid-template-columns:28px minmax(0,1fr) auto;gap:10px;align-items:center;padding:10px 4px;border-bottom:1px solid var(--line)}
 .board-list li:last-child{border-bottom:0}
+.fbpanel{margin-top:20px}.fbform{display:grid;gap:12px}.fbkinds{max-width:420px}.fbkinds .tab[aria-checked="true"]{background:var(--deep);color:var(--foam);box-shadow:inset 0 0 0 1px var(--line-strong)}.fbl{display:grid;gap:6px}.fbl textarea{width:100%;min-height:96px;resize:vertical;font:inherit;padding:10px 12px;border-radius:10px;border:1px solid var(--line);background:rgba(255,255,255,.04);color:inherit}.fbl textarea:focus-visible{outline:2px solid var(--accent,#ffa24c);outline-offset:1px}.fbfoot{display:flex;gap:12px;align-items:center;flex-wrap:wrap}.fbfoot .hint:nth-child(2){flex:1 1 280px;min-width:0}
+.nmform{display:grid;gap:8px;padding:12px;border:1px solid var(--line);border-radius:10px}.nmform input{width:100%}.signin-cta{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
 .rklist{list-style:none;margin:0;padding:0;display:grid}.rklist li{display:grid;grid-template-columns:30px minmax(0,1fr) auto;gap:10px;align-items:center;padding:9px 4px;border-bottom:1px solid var(--line)}.rklist li:last-child{border-bottom:0}.rklist li.you{background:rgba(255,196,126,.1);border-radius:8px}.rklist .rk{font-family:var(--f-display);font-weight:800;color:var(--muted);font-variant-numeric:tabular-nums}.rklist .who{min-width:0}.rklist .who b{font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.rklist .who .rksp{font-size:13px;color:var(--muted);overflow:hidden;white-space:nowrap}
 .rklist .who .rksp{display:flex;align-items:center;gap:6px;margin-top:2px}.rklist .rksp img{height:16px;max-width:54px;object-fit:contain;background:#fff;padding:2px 4px;border-radius:4px}.rklist .rksp.none{opacity:.6}.rklist .who b{display:flex;align-items:center;gap:6px}.rklist .val{text-align:right;font-weight:800}.rklist .val small{display:block;font-size:11px;font-weight:500;color:var(--muted)}.rkpanel .tabs{margin-bottom:6px}
 .board-list .rk{font-family:var(--f-display);font-weight:800;color:var(--muted);font-variant-numeric:tabular-nums}
@@ -4634,9 +4662,36 @@ function homeA(){const b=homeBits();
       <div class="stack"><section class="panel" aria-labelledby="lb-h">${leaderboardPanel("waves-all","lb-h")}</section>
       <section class="panel" aria-labelledby="rec-h">${recsPanel("rec-h")}</section></div>
     </div>
+    <section class="panel fbpanel" id="fbpanel" aria-labelledby="fb-h">${feedbackPanel("fb-h")}</section>
   </main>`}
 
 function homeView(){return homeA()}
+
+/* ---------- Feedback: players send a bug, an idea or anything else. It goes to the feedback table; only the game's owner can read it ---------- */
+const FB={kind:"bug",last:0,draft:""};
+const FB_KINDS=[["bug","Bug","Something broke or looks wrong"],["idea","Idea","Something you'd like added"],["other","Other","Anything else"]];
+function feedbackPanel(hid){const K=FB_KINDS.find(k=>k[0]===FB.kind)||FB_KINDS[0];
+  return `<div class="panel-head"><h2 id="${hid}">Send feedback</h2><span class="label">Straight to the person who makes SwellQuest</span></div>
+    <form id="fbForm" class="fbform">
+      <div class="tabs fbkinds" role="radiogroup" aria-label="What kind of feedback">${FB_KINDS.map(([id,l])=>`<button type="button" class="tab" role="radio" aria-checked="${id===FB.kind}" data-fb="${id}">${l}</button>`).join("")}</div>
+      <label class="fbl" for="fbMsg"><span class="hint">${esc(K[2])}${FB.kind==="bug"?". Say what you were doing and which break you were at.":"."}</span>
+        <textarea id="fbMsg" maxlength="1000" rows="4" placeholder="${FB.kind==="bug"?"I was surfing Pipeline and…":FB.kind==="idea"?"It would be sick if…":"Tell us anything"}">${esc(FB.draft)}</textarea></label>
+      <div class="fbfoot"><span class="hint" id="fbCount">${FB.draft.length}/1000</span><span class="hint">Your surfer name is sent with it. Please don't include personal details like your address or phone number.</span><button class="btn primary" type="submit" id="fbSend">Send</button></div>
+      <p class="hint" id="fbStatus" aria-live="polite"></p>
+    </form>`}
+const fbInfo=()=>{const u=navigator.userAgent,m=u.match(/(Edg|OPR|Chrome|Firefox|Version)\/([\d]+)/);return ((m?({Edg:"Edge",OPR:"Opera",Chrome:"Chrome",Firefox:"Firefox",Version:"Safari"}[m[1]]+" "+m[2]):"Browser")+(/Windows/.test(u)?" · Windows":/Mac OS/.test(u)?" · Mac":/CrOS/.test(u)?" · Chromebook":"")+" · "+innerWidth+"×"+innerHeight+" · build 2026-11-18").slice(0,200)};
+document.addEventListener("click",e=>{const b=e.target.closest("[data-fb]");if(!b)return;FB.kind=b.dataset.fb;const p=$("#fbpanel");if(p){p.innerHTML=feedbackPanel("fb-h");const t=$("#fbMsg");if(t)t.focus()}});
+document.addEventListener("input",e=>{if(e.target.id!=="fbMsg")return;FB.draft=e.target.value;const c=$("#fbCount");if(c)c.textContent=FB.draft.length+"/1000"});
+document.addEventListener("submit",async e=>{if(e.target.id!=="fbForm")return;e.preventDefault();const st=$("#fbStatus"),btn=$("#fbSend"),t=(($("#fbMsg")||{}).value||"").trim(),say=m=>{if(st)st.textContent=m};
+  if(t.length<5){say("Write a bit more first.");return}
+  if(Date.now()-FB.last<60000){say("Thanks, you just sent one. You can send another in a minute.");return}
+  if(!onlineOn()||!NET.client){say("Feedback needs the internet. Try again when you're online.");return}
+  btn.disabled=true;say("Sending…");
+  const row={kind:FB.kind,message:t.slice(0,1000),username:(NET.user&&NET.name)||(state&&state.player&&state.player.name)||null,user_id:NET.user?NET.user.id:null,level:SQ.career.level||null,info:fbInfo()};
+  let err=null;try{const r=await NET.client.from("feedback").insert(row);err=r.error}catch(x){err=x}
+  btn.disabled=false;
+  if(err){say(/relation|schema cache|does not exist|feedback/i.test(err.message||"")?"Feedback isn't switched on yet. Try again later.":netDown(err)?NET_DOWN:"Couldn't send it. Try again in a moment.");console.warn("Feedback:",err&&err.message||err);return}
+  FB.last=Date.now();FB.draft="";const m=$("#fbMsg");if(m)m.value="";const c=$("#fbCount");if(c)c.textContent="0/1000";say("Thanks! Your feedback was sent.");toast("Feedback sent")});
 
 let lbTab="waves-all";
 function leaderboardPanel(tab,headId){
@@ -4744,7 +4799,13 @@ function profileView(){
         <div style="display:grid;gap:8px">
           <h2 style="overflow-wrap:anywhere">${esc(p.name)}</h2>
           <span class="label">${p.stance==="goofy"?"Goofy":"Regular"} foot · Level ${SQ.career.level}</span>
-          <button class="btn small" data-act="edit-look">Change look</button>
+          <div class="cta-row" style="gap:8px"><button class="btn small" data-act="edit-look">Change look</button><button class="btn small" type="button" data-nm="open" aria-expanded="false" aria-controls="nmForm">Change name</button></div>
+          <form id="nmForm" class="nmform" hidden>
+            <label class="shsl" for="nmNew">New surfer name <input type="text" id="nmNew" maxlength="16" value="${esc(p.name)}" autocomplete="off" spellcheck="false"></label>
+            <span class="hint">3–16 letters, numbers, dot, dash or underscore.${NET.user?" You'll sign in with the new name from now on.":""}</span>
+            <div class="cta-row" style="gap:8px"><button class="btn small primary" type="submit" id="nmSave">Save name</button><button class="btn small ghost" type="button" data-nm="close">Cancel</button></div>
+            <p class="hint" id="nmMsg" aria-live="polite"></p>
+          </form>
         </div>
       </aside>
       <div class="stack">
@@ -5028,7 +5089,8 @@ function creatorView(){
   const last=step===STEP_NAMES.length-1;
   return `<main class="wrap" style="display:grid;gap:20px">
     ${editing?'<a class="back" href="#profile">← Profile</a>':""}
-    <div><span class="label">${editing?"Change your look":"New career"}</span><h1 style="font-size:clamp(30px,5vw,48px);font-weight:900;font-stretch:118%;margin-top:4px">${editing?"Back to the mirror":"Create your surfer"}</h1></div>
+    <div class="cta-row" style="justify-content:space-between;align-items:flex-end;gap:14px"><div><span class="label">${editing?"Change your look":"New career"}</span><h1 style="font-size:clamp(30px,5vw,48px);font-weight:900;font-stretch:118%;margin-top:4px">${editing?"Back to the mirror":"Create your surfer"}</h1></div>
+      ${!editing&&onlineOn()?`<div class="signin-cta"><span class="hint">Already have a surfer?</span><a class="btn primary" href="#account">Sign in</a></div>`:""}</div>
     <div class="create">
       <aside class="preview"><div class="avatar-frame" id="pv"><canvas class="av3d" data-av="draft" width="420" height="490" aria-label="Your surfer in 3D. Drag to turn."></canvas></div>
         <div style="display:grid;gap:4px"><b style="font-family:var(--f-display);font-size:18px;overflow-wrap:anywhere" id="pvname">${esc(d.name||"Your name")}</b><span class="label" id="pvstance">${d.stance==="goofy"?"Goofy":"Regular"} foot</span></div></aside>
@@ -5362,13 +5424,13 @@ function route(){
   }
   else if(!SQ.heat.active&&typeof LOBBY!=="undefined"&&LOBBY.heatCh&&v!=="play")leaveHeatCh();
   if(!VIEWS.has(v))v="home";
-  if(!state&&v!=="create"){ if(location.hash!=="#create"){location.hash="#create";return} v="create"; }
+  if(!state&&v!=="create"&&v!=="account"){ if(location.hash!=="#create"){location.hash="#create";return} v="create"; }
   if(state&&v==="create")v="home";
   if(v==="play"||v==="forecast"){document.body.classList.remove("in-menu");SQ.enter();if(v==="forecast")SQ.openForecast();return}
   document.body.classList.add("in-menu");
   const app=$("#app");
   if(v==="create"){
-    if(!draft||editing){editing=false;step=0;draft={name:"",country:"au",hair:"short",hairColour:"Salt blond",skin:"Tan",eyes:"round",brows:"straight",facial:"none",zinc:"nose",stance:"regular",kit:"navy",boardColour:"#1d6fc4"}}
+    if(!draft||editing){editing=false;step=0;draft={name:(NET.user&&NET.name)||"",country:"au",hair:"short",hairColour:"Salt blond",skin:"Tan",eyes:"round",brows:"straight",facial:"none",zinc:"nose",stance:"regular",kit:"navy",boardColour:"#1d6fc4"}}
     app.innerHTML=creatorView();
   }else if(v==="look"){
     if(!editing){editing=true;step=1;draft=Object.assign({},state.player)}
@@ -5962,6 +6024,30 @@ async function netSignIn(name,pass){
   if(error)return netDown(error)?NET_DOWN:"Wrong name or password.";NET.user=data.user;await netWho();
   if(!NET.name){const p=await NET.client.from("profiles").insert(Object.assign({id:NET.user.id,username:name},state?pubStats():{}));if(!p.error)NET.name=name}
   await netAfterLogin();lobbyJoin();return null}
+/* change your surfer name: the name on the leaderboards and the one you sign in with */
+async function netRename(name){
+  if(!/^[A-Za-z0-9._-]{3,16}$/.test(name))return "Use 3–16 letters, numbers, dot, dash or underscore.";
+  const old=(NET.user&&NET.name)||state.player.name;if(name===old)return "That's already your name.";
+  if(!NET.user){state.player.name=name;save();syncSurfer();return null}   // not signed in: just this browser's surfer
+  if(!NET.ready||!NET.client)return NET_DOWN;
+  const taken=await NET.client.from("profiles").select("id").ilike("username",name).neq("id",NET.user.id).limit(1);
+  if(taken.error)return netDown(taken.error)?NET_DOWN:taken.error.message;if(taken.data&&taken.data.length)return "That name is taken.";
+  const sameLogin=old&&old.toLowerCase()===name.toLowerCase();   // only the capitals change: the sign-in stays the same
+  if(!sameLogin){const {data,error}=await NET.client.auth.updateUser({email:mailOf(name)});
+    if(error)return netDown(error)?NET_DOWN:/registered|exists|already/i.test(error.message)?"That name is taken.":error.message;
+    if(!data||!data.user||String(data.user.email||"").toLowerCase()!==mailOf(name))return "The online service wants to confirm this change, so your name can't be changed right now. Nothing was changed."}
+  const u=await NET.client.from("profiles").update({username:name}).eq("id",NET.user.id);
+  if(u.error){if(!sameLogin){try{await NET.client.auth.updateUser({email:mailOf(old)})}catch(e){}}return /duplicate|unique/i.test(u.error.message)?"That name is taken.":u.error.message}
+  NET.name=name;state.player.name=name;save();syncSurfer();netPush(true).catch(()=>{});
+  // your tour place and your team show the new name straight away
+  if(LG.row&&[...LG.row.wsl,...LG.row.cs].some(m=>m.id===NET.user.id))lgEdit("league","main",t=>{let n=0;["wsl","cs"].forEach(k=>(t[k]||[]).forEach(m=>{if(m.id===NET.user.id){m.name=name;n++}}));return n?{patch:{wsl:t.wsl,cs:t.cs}}:{noop:true}}).then(r=>{if(r.ok&&r.t)LG.row=r.t}).catch(()=>{});
+  const tm=SQ.career.team;if(tm&&tm.id)lgEdit("teams",tm.id,t=>{let n=0;(t.members||[]).forEach(m=>{if(m.id===NET.user.id){m.name=name;n++}});if(t.owner===NET.user.id){t.owner_name=name;n++}return n?{patch:{members:t.members,owner_name:t.owner_name}}:{noop:true}}).catch(()=>{});
+  if(typeof lobbyUpdate==="function")lobbyUpdate();return null}
+document.addEventListener("click",e=>{const b=e.target.closest("[data-nm]");if(!b)return;const f=$("#nmForm"),o=document.querySelector('[data-nm="open"]');if(!f)return;
+  const open=b.dataset.nm==="open"&&f.hidden;f.hidden=!open;if(o)o.setAttribute("aria-expanded",String(open));if(open){const i=$("#nmNew");i.focus();i.select()}});
+document.addEventListener("submit",async e=>{if(e.target.id!=="nmForm")return;e.preventDefault();const i=$("#nmNew"),m=$("#nmMsg"),btn=$("#nmSave"),n=(i.value||"").trim();
+  btn.disabled=true;m.textContent="Saving…";const err=await netRename(n);btn.disabled=false;
+  if(err){m.textContent=err;i.focus();return}toast(`You're now ${n}`);purse();route()});
 async function netSignOut(){lobbyLeave();if(NET.dirty)await netPush(true);await NET.client.auth.signOut();NET.user=null;NET.name=null}
 async function netScore(r){
   if(!NET.client||!NET.user||!NET.name||!(r.score>0))return;
@@ -5991,7 +6077,7 @@ async function netFillBoard(){const box=document.querySelector(".board-list:not(
   box.innerHTML=rows||(tab==="heats"?'<li><span class="rk">–</span><span class="who"><b>No heats surfed yet</b><span>Win a live heat to get on the rankings.</span></span><span class="val"></span></li>':'<li><span class="rk">–</span><span class="who"><b>No scores yet</b><span>Be the first to post one.</span></span><span class="val"></span></li>');
   const note=box.parentElement.querySelector(".note");if(note)note.textContent=NET.user?`Live leaderboard. You're signed in as ${NET.name}.`:"Live leaderboard. Sign in to put your own surfer on it."}
 function accountView(){
-  const head=`<a class="back" href="#home">← Home</a><div><span class="label">Section 9 · Online</span><h1 style="font-size:clamp(30px,5vw,48px);font-weight:900;font-stretch:118%;margin-top:4px">Online account</h1></div>`;
+  const head=`${state?'<a class="back" href="#home">← Home</a>':'<a class="back" href="#create">← New surfer</a>'}<div><span class="label">Section 9 · Online</span><h1 style="font-size:clamp(30px,5vw,48px);font-weight:900;font-stretch:118%;margin-top:4px">Online account</h1></div>`;
   if(!onlineOn())return `<main class="wrap" style="display:grid;gap:18px;max-width:760px">${head}<section class="panel" style="display:grid;gap:10px"><h2>Online play isn't switched on yet</h2>
     <p>Accounts, cloud saves and shared leaderboards need the game's free Supabase project. Once its address and public key are added to the game file, this page lets you make an account and sign in from any computer.</p><p class="hint">Your progress is saved in this browser until then.</p></section></main>`;
   if(!NET.ready)return `<main class="wrap" style="display:grid;gap:18px;max-width:760px">${head}<section class="panel"><p>${NET.err?esc(NET.err):"Connecting…"}</p></section></main>`;
@@ -6000,10 +6086,10 @@ function accountView(){
     <div class="cta-row"><button class="btn primary" data-net="push">Save to the cloud now</button><button class="btn ghost" data-net="out">Sign out</button></div><p class="hint" id="netMsg" aria-live="polite"></p></section></main>`;
   const nm=state?state.player.name:"";
   return `<main class="wrap" style="display:grid;gap:18px;max-width:760px">${head}<section class="panel" style="display:grid;gap:12px"><h2>Sign in or make an account</h2>
-    <p class="hint">Use a surfer name and a password. No email needed. Your mates see your surfer name on the leaderboards.</p>
+    <p class="hint">${state?"Use a surfer name and a password. No email needed. Your mates see your surfer name on the leaderboards.":"Sign in with your surfer name and password to carry on your career on this computer. New to SwellQuest? <a href=\"#create\">Create your surfer</a> first."}</p>
     <label class="shsl">Surfer name <input type="text" id="netName" maxlength="16" value="${esc(nm)}" autocomplete="username"></label>
     <label class="shsl">Password <input type="password" id="netPass" autocomplete="current-password"></label>
-    <div class="cta-row"><button class="btn primary" data-net="in">Sign in</button><button class="btn" data-net="up">Make an account</button></div><p class="hint" id="netMsg" aria-live="polite"></p></section></main>`;
+    <div class="cta-row"><button class="btn primary" data-net="in">Sign in</button>${state?'<button class="btn" data-net="up">Make an account</button>':""}</div><p class="hint" id="netMsg" aria-live="polite"></p></section></main>`;
 }
 document.addEventListener("click",async e=>{const b=e.target.closest("[data-net]");if(!b)return;const k=b.dataset.net,msg=t=>{const m=$("#netMsg");if(m)m.textContent=t};
   if(k==="push"){const r=await netPush(true);msg(r.ok?"Saved to the cloud.":r.msg);return}
@@ -6535,7 +6621,9 @@ async function lgSettle(evs){for(const ev of evs){if(ev.status==="done")continue
   const r=await lgEdit("league_events",ev.id,t=>lgResolve(t)?{patch:{bracket:t.bracket,status:t.status}}:{noop:true});
   if(r.ok&&r.t)Object.assign(ev,r.t)}}
 /* the amateurs who can move up: level 15, 10 heat wins and a sponsor signed */
-async function lgEligible(){const {data,error}=await NET.client.from("profiles").select("id,username,country,rating,level").eq("lad_elig",true).order("rating",{ascending:false}).limit(60);
+/* amateurs who can move up: flagged by their own game, or (if their game hasn't flagged them yet) level 15+, 10+ heat wins and a sponsor signed */
+async function lgEligible(){let {data,error}=await NET.client.from("profiles").select("id,username,rating,level").or('lad_elig.eq.true,and(level.gte.15,heat_wins.gte.10,cabinet->sponsors.cs.[{"cur":true}])').order("rating",{ascending:false}).limit(60);
+  if(error)({data,error}=await NET.client.from("profiles").select("id,username,rating,level").eq("lad_elig",true).order("rating",{ascending:false}).limit(60));
   if(error)return [];return (data||[]).filter(p=>p.id&&p.username).sort((a,b)=>(b.rating||1000)-(a.rating||1000))}
 const favOf=(heats,id)=>{const c={};heats.filter(h=>h.user_id===id&&h.board).forEach(h=>c[h.board]=(c[h.board]||0)+1);return Object.entries(c).sort((a,b)=>b[1]-a[1])[0]?.[0]||null};
 /* the end of a month: titles, then 2 up and 2 down between each level. Computer surfers go first when a place is needed */
@@ -6704,7 +6792,7 @@ function rkSponsor(id,bot,tour){
   return RK.sp[id]||null}
 function rkRows(){const me=NET.user&&NET.user.id,tab=RK.tab;
   const spTag=(o)=>{const sp=o?rkSponsor(o.id,o.bot,o.tour):null;return sp?`<span class="rksp">${rkLogo(sp.k)}${esc(sp.name)}</span>`:'<span class="rksp none">No sponsor</span>'};
-  const li=(rank,o,name,val,sub)=>`<li class="${o.id===me?"you":""}"><span class="rk">${rank}</span><span class="who"><b>${lgFlag(o.country)} ${o.bot?esc(name):`<a href="javascript:void 0" class="cablink" data-cab="${esc(o.id)}" data-cabn="${esc(name)}">${esc(name)}</a>`}${o.bot?' <i class="botag" title="Computer surfer">CPU</i>':""}</b>${spTag(o)}</span><span class="val">${val}<small>${sub}</small></span></li>`;
+  const li=(rank,o,name,val,sub)=>`<li class="${o.id===me?"you":""}"><span class="rk">${rank}</span><span class="who"><b>${o.country?lgFlag(o.country)+" ":""}${o.bot?esc(name):`<a href="javascript:void 0" class="cablink" data-cab="${esc(o.id)}" data-cabn="${esc(name)}">${esc(name)}</a>`}${o.bot?' <i class="botag" title="Computer surfer">CPU</i>':""}</b>${spTag(o)}</span><span class="val">${val}<small>${sub}</small></span></li>`;
   if(tab==="am"){const L=(LG.elig||[]).filter(p=>!(LG.row&&[...LG.row.wsl,...LG.row.cs].some(m=>m.id===p.id)));
     if(me&&ladElig()&&!L.some(p=>p.id===me)){L.push({id:me,username:NET.name||"You",country:myCountry(),rating:Math.round(heatRec().rating),level:SQ.career.level});L.sort((a,b)=>(b.rating||1000)-(a.rating||1000))}if(!L.length)return '<p class="hint">No sponsored amateurs yet. Reach level 15, win 10 heats and sign a minor sponsor to be the first.</p>';
     const i=L.findIndex(p=>p.id===me),show=L.slice(0,15);if(i>=15)show.push(L[i]);
