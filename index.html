@@ -1078,7 +1078,7 @@ function resetSet(){
 let wFrame=0,spawnClock=0;const SET_GAP=()=>P.storm?.5:1.5;   // pause before the next wave appears once the last one has broken
 function stepWaves(dt,t){
   wFrame++;const A=activeWave();
-  waves.forEach((W,idx)=>{
+  waves.forEach(W=>{
     if(W.remote)heatMoveRemote(W,dt);
     else if(HEAT&&W.clock&&!W.peeling)W.z=heatClockZ(W);
     else W.z+=(W.peeling?(W===rideW||W.hot?VZ:2.4):(W.boost?3.2:.9))*dt;   // waves nobody is riding clear out quickly   // swells roll in, then slow right down once breaking
@@ -1088,13 +1088,18 @@ function stepWaves(dt,t){
         if(W.peelT>W.closeAt&&!W.closing){W.closing=true;if(W===rideW&&mode==="ride")popText("Closing out!","Kick out over the top, or straighten out and ride it in")}}
       W.cmul=W.closing?Math.min(7,(W.cmul||1)+dt*5):1;
       W.peelX+=P.dir*P.peel*Math.sqrt(P.H/2)*W.cmul*dt}
-    // background waves only need a refresh every third frame
-    if(W===A||W===rideW||W.hot||W.dirty!==false||(wFrame+idx)%3===0){updateWave(W,t);W.dirty=false}
   });
-  // a wave behind the one being ridden can't catch up and roll through it: it holds back a full wave-length
-  {const lead=rideW&&waves.includes(rideW)?rideW:null;
-   if(lead)for(const W of waves){if(W===lead||W.z>=lead.z)continue;const gap=10*P.H+14;if(W.z>lead.z-gap){W.z=lead.z-gap;W.dirty=true}}
-   if(HEAT)for(const L of waves){if(!L.remote&&!L.hot)continue;for(const W of waves){if(W===L||W===lead||W.z>=L.z)continue;const gap=10*P.H+14;if(W.z>L.z-gap){W.z=L.z-gap;W.dirty=true}}}}
+  // a wave behind the one being ridden can't catch up and roll through it: it holds back a full wave-length.
+  // This runs before the waves are drawn, so what you see is where the wave really is.
+  {const lead=rideW&&waves.includes(rideW)?rideW:null,gap=10*P.H+14;
+   if(lead)for(const W of waves){if(W===lead||W.z>=lead.z)continue;if(W.z>lead.z-gap)W.z=lead.z-gap}
+   if(HEAT)for(const L of waves){if(!L.remote&&!L.hot)continue;for(const W of waves){if(W===L||W===lead||W.z>=L.z)continue;if(W.z>L.z-gap)W.z=L.z-gap}}}
+  waves.forEach((W,idx)=>{
+    // background waves only need a refresh every third frame. While you paddle for a wave in a heat, the wave
+    // someone else is riding is behind you, so it counts as background and your wave gets the time
+    const behind=W.remote&&mode==="paddle"&&W!==rideW&&!W.hot;
+    if((W===A&&!behind)||W===rideW||W.hot||W.dirty!==false||(wFrame+idx)%3===0){updateWave(W,t);W.dirty=false}
+  });
   waves=waves.filter(W=>{if(W.fade<=0&&W.z>P.beachZ-10){disposeWave(W);return false}return true});
   if(HEAT)return;   // in a 1 v 1 heat the host sends out the waves
   spawnClock+=dt;
@@ -2725,7 +2730,8 @@ function judgePanel(){const home=homeJudge(breakId),seed=HEAT&&HEAT.panelSeed?HE
 const SCORE_K=.4,FALL_PEN=2,TOP_NOSIG=9.5;
 /* Scores are out of 10, but the judging is harder: everything the old 10 asked for now earns a 4.
    Above 4 the judges want more on top of that: combos (3+ manoeuvres linked together) and a range of difficult tricks.
-   Without a signature move nobody scores more than 9.5; a 10 needs your signature move landed as well. A fall takes 2 points off the wave. */
+   Without a signature move nobody scores more than 9.5; a 10 needs your signature move landed as well.
+   A fall is scored as if you had kicked out at that moment, minus 2 points. */
 const eqOf=s=>s<=4?s/SCORE_K:10+(s-4)*5/6;   // the old 0-10 scale (and up to 15 above it) for pay, XP and achievements
 const clamp01=x=>Math.max(0,Math.min(1,x));
 function judgeRide(R,outcome){
@@ -2733,6 +2739,8 @@ function judgeRide(R,outcome){
   let cut=moves.length;
   if(outcome==="wipe"&&cut>0&&R.t-moves[cut-1].t<.8)cut--;          // the manoeuvre you fell on isn't completed
   const done=moves.slice(0,cut);
+  // a fall is judged like the same ride kicked out cleanly, then the fall takes 2 points off
+  const fellOff=outcome==="wipe";if(fellOff)outcome="complete";
   const seen={},turns=[],barrels=[],airs=[];
   done.forEach(m=>{
     if(m.air){const rep=seen[m.name]=(seen[m.name]||0)+1,crit=m.d==null?.4:sstep(5,.5,m.d/H);
@@ -2791,7 +2799,7 @@ function judgeRide(R,outcome){
   // like the WSL: the highest and lowest of the five are dropped and the middle three averaged
   const ord=judges.map((j,i)=>[j.score,i]).sort((a,b)=>a[0]-b[0]);judges[ord[0][1]].drop=true;judges[ord[4][1]].drop=true;
   let score=Math.round(judges.filter(j=>!j.drop).reduce((s,j)=>s+j.score,0)/3*100)/100;
-  const fell=outcome==="wipe",pre=score;if(fell)score=Math.max(0,Math.round((score-FALL_PEN)*100)/100);
+  const fell=fellOff,pre=score;if(fell)score=Math.max(0,Math.round((score-FALL_PEN)*100)/100);
   if(sigHit&&HEAT)score=Math.min(10,Math.round((score+SIG_BONUS)*100)/100);
   const sumT=turns.reduce((s,x)=>s+x.v,0),sumB=barrels.reduce((s,x)=>s+x.v,0),sumHard=turns.filter(x=>x.m.hard).reduce((s,x)=>s+x.v,0);
   const crit={
@@ -2813,10 +2821,10 @@ function judgeRide(R,outcome){
   else if(pre>=3.6&&outcome==="complete")why.push("To go above 4 the judges want combos (3 or more manoeuvres linked together) and a range of difficult tricks.");
   if(score>=TOP_NOSIG-.3&&!sigHit)why.push("9.5 is the most anyone can score without their signature move. A 10 needs it landed on the wave.");
   if(sigHit)why.push(`Signature ${career.sig.toLowerCase()} landed${HEAT?`: +${SIG_BONUS.toFixed(2)} from the judges`:""}. It opens up a 10.`);
-  if(outcome==="wipe")why.push("The ride ended in a wipeout, which caps the score.");
+  if(fell);
   else if(outcome==="complete"&&n)why.push("Completed the wave cleanly.");
   else if(outcome==="lost")why.push("The wave got away from you before the end.");
-  if(fell)why.push(`The fall cost 2 points (${pre.toFixed(2)} before the fall).`);
+  if(fell)why.push(`You fell, so it was judged like a kick-out at that point (${pre.toFixed(2)}) and the fall cost 2 points.`);
   return {score,eq:eqOf(score),fell,pre,judges,crit,lift,combos:chains.length,why:why.filter(Boolean).join(" "),turns,barrels,airs,done};
 }
 function band(s){return s<1.1?"Poor":s<2.1?"Fair":s<3.2?"Average":s<4.3?"Good":s<5.7?"Excellent":"Outstanding"}
@@ -3810,12 +3818,15 @@ function heatOnMsg(m){
 function heatMoveRemote(W,dt){const age=Math.min(.6,(performance.now()-(W.rt||0))/1000),k=Math.min(1,dt*8);
   // on your screen a wave someone else is riding drifts on toward the beach (their rider goes with it), so the
   // next wave can come through behind it and you can catch it while they're still riding
-  if(W.peeling)W.rShift=Math.min(70,(W.rShift||0)+1.6*dt);
+  // and while you paddle for the wave held behind it, it moves on at the pace of the wave you're chasing
+  const chase=mode==="paddle"&&target&&target.W!==W&&target.W.z<W.z;
+  if(W.peeling)W.rShift=Math.min(70,(W.rShift||0)+(chase?3.2:1.6)*dt);
   W.z+=((W.rz+(W.rvz||0)*age+(W.rShift||0))-W.z)*k;if(W.peeling)W.peelX+=((W.rpx+(W.rvpx||0)*age)-W.peelX)*k}
+const _ghRp=new THREE.Vector3(),_ghBp=new THREE.Vector3();
 function heatGhostStep(dt){heatOpps().forEach((o,idx)=>{
   const g=o.ghost;if(!g)return;if(!g.has||o.quit){g.rig.root.visible=g.board.visible=g.tag.visible=false;return}const m=g.tp,k=Math.min(1,dt*14);
   const show=!!m.vis;g.rig.root.visible=g.board.visible=g.tag.visible=show;
-  const rp=new THREE.Vector3().fromArray(m.rp),bp=new THREE.Vector3().fromArray(m.bp);
+  const rp=_ghRp.fromArray(m.rp),bp=_ghBp.fromArray(m.bp);
   const RW=m.rr&&m.wid!=null?waves.find(w=>w.hid===m.wid):null;
   if(RW){bp.set(RW.peelX+m.br[0],0,RW.z+m.br[2]);
     // the board sits on OUR copy of the water at the same height above it as on theirs
@@ -7182,7 +7193,7 @@ setInterval(()=>{if(location.hash==="#heats"&&NET.user&&TOUR.loaded&&!TOUR.err&&
 function heatsView(){
   const head=`<a class="back" href="#home">← Home</a><div><span class="label">Local heats · Challenger Series · WSL Tour</span><h1 style="font-size:clamp(30px,5vw,48px);font-weight:900;font-stretch:118%;margin-top:4px">Heats &amp; Tours</h1></div>`;
   const rules=`<section class="panel hrules"><h2>How a heat works</h2><ul>
-    <li><b>Judging.</b> Five judges from the 10 judging nations score every wave, always including one from the break's own country. The highest and lowest are dropped and the middle three averaged. Scores are out of 10, but the judging is tough. Everything that used to earn a 10 now earns about a 4. To go higher you need combos (3 or more manoeuvres linked together) and a range of difficult tricks on top. The most you can score without your signature move is 9.5; a 10 needs your signature move landed on the wave. A fall takes 2 points off that wave.</li>
+    <li><b>Judging.</b> Five judges from the 10 judging nations score every wave, always including one from the break's own country. The highest and lowest are dropped and the middle three averaged. Scores are out of 10, but the judging is tough. Everything that used to earn a 10 now earns about a 4. To go higher you need combos (3 or more manoeuvres linked together) and a range of difficult tricks on top. The most you can score without your signature move is 9.5; a 10 needs your signature move landed on the wave. A fall is scored as if you had kicked out at that point, minus 2 points.</li>
     <li><b>Tour heats</b> (Challenger Series and WSL Tour): you surf your heat on your own, any time before the week's event ends, and your opponent surfs theirs. If they've surfed already, or they're a computer surfer, their scores come in as your heat goes on. The higher total goes through. A heat can only be surfed once, so leaving part-way keeps what you'd scored.</li>
     <li><b>Local heats</b> are against a computer surfer from your home break, until there's a crowd of real surfers online.</li>
     <li><b>Tag team.</b> With 4 surfers you can tick <b>2 v 2 tag team</b>: you and your first pick against the other two. Each team's score is both surfers' totals added together. Winners split the pot and each get the prize.</li>
